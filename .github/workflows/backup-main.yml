@@ -1,0 +1,31 @@
+name: Weekly backup main → main-backup
+
+# Mirrors the current tip of `main` onto `main-backup` so we always have
+# a one-PR-away restore point if main gets corrupted by a Sync-fork
+# misclick, a bad merge, or anything else surprising.
+#
+# Schedule: every Saturday 22:00 IST (= 16:30 UTC, day-of-week 6).
+# Cron is in UTC; IST = UTC+5:30, so 22:00 IST → 16:30 UTC.
+
+on:
+  schedule:
+    - cron: "30 16 * * 6"
+  workflow_dispatch:        # also allow manual runs from the Actions tab
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # needed to push to main-backup
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0    # full history so the push lands cleanly
+
+      - name: Force-push main → main-backup
+        run: |
+          set -euo pipefail
+          echo "Mirroring $(git rev-parse HEAD) to refs/heads/main-backup"
+          git push --force origin HEAD:refs/heads/main-backup
