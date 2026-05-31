@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/cover.png" alt="lwchat" width="100%">
+</p>
+
 # lwchat
 
 > **lwchat** is a zero-dependency Node.js CLI that bridges your issue tracker (Redmine) and Google Chat: locate the thread for any issue, read the discussion, post replies with auto-resolved `@mentions`, send direct messages, and search across spaces — all from one terminal command, with first-class JSON output for AI agents.
@@ -165,4 +169,4 @@ Zero npm dependencies. Only Node.js stdlib: `http`, `fs`, `path`, `url`, `child_
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Built by Sibin C Baby.
+[MIT](LICENSE)
