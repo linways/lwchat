@@ -1,0 +1,25 @@
+# Dependencies (none today, but reserved if any are ever added)
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Build artefacts (lwchat is plain ESM JS — none today, reserved)
+dist/
+build/
+
+# Anything that would leak credentials or org-specific runtime state.
+# lwchat's data lives in ~/.lwchat (outside the repo) so this is belt-and-braces.
+*.token
+*.tokens.json
+client_secret*.json
+credentials.json

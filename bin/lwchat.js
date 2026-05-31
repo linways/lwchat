@@ -1,0 +1,314 @@
+#!/usr/bin/env node
+
+import {
+  cmdAuthLogin,
+  cmdAuthStatus,
+  cmdDoctor,
+  cmdMe,
+  cmdSpaces,
+  cmdSpacesAdd,
+  cmdSpacesRemove,
+  cmdSpacesFetch,
+  cmdFind,
+  cmdRead,
+  cmdReply,
+  cmdPost,
+  cmdDm,
+  cmdDirectory,
+  cmdWarm,
+  cmdSearch,
+  cmdThreads,
+  cmdIndex,
+  cmdCache,
+  cmdMembers,
+  cmdMembersRefresh,
+  cmdBackup,
+  cmdRestore,
+  cmdBackupList,
+  cmdBackupDelete,
+} from "../lib/commands.js";
+
+const HELP = `
+lwchat — Google Chat <-> Redmine thread bridge
+
+USAGE:
+    lwchat <command> [options] [args]
+
+COMMANDS:
+    auth login [--client-id <id> --client-secret <secret> | --import-gws]
+    auth status                         Check authentication status
+    doctor                              Runtime health check (config, auth, network)
+
+    me [--refresh]                      Show your identity + spaces (writes me.md)
+
+    spaces                              List configured spaces
+    spaces fetch                        Fetch all spaces from Google Chat
+    spaces add <alias> <space_id>       Add a space
+    spaces remove <alias>               Remove a space
+
+    find    <issue_id>                  Find the issue's thread(s) — reports every space it's in
+    read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
+    reply   <issue_id> <message> [--space <a>]  Reply; --space required when issue spans spaces
+
+    post    <space> <message> [--thread <name>]  Post to a space; --thread replies to a specific thread
+    dm      <user> <message>            DM a user (email/name/users/id); auto-creates DM if needed
+    directory <query> [--refresh]       Search the org directory (cached 24h)
+    warm                                Pre-fetch all configured spaces' members + names (cache hot)
+    search  <term> [--space <a> | --spaces a,b,c] [--limit N] [--case-sensitive]
+                                        Search messages across configured spaces (client-side scan)
+
+    threads [--space <alias>]           List recent threads
+    index   [--space <alias>]           Build/refresh the thread-to-issue index
+    cache   [show]                      Show cached threads + freshness (TTL)
+    cache   clear                       Clear the thread location cache
+
+    members [--space <alias>]           List space members (name → user ID)
+    members refresh [--space <alias>]   Refresh member cache from API
+
+    backup  [label]                     Backup config, tokens, and cache
+    backup  list                        List all backups
+    backup  delete <name>               Delete a backup
+    restore [name]                      Restore from backup (latest if no name)
+
+FLAGS:
+    --json          Machine-readable JSON output
+    -h, --help      Show this help
+
+SETUP:
+    # Option 1: Fresh OAuth login
+    lwchat auth login --client-id <id> --client-secret <secret>
+
+    # Option 2: Import existing gws credentials
+    lwchat auth login --import-gws
+
+    # Then add spaces to search
+    lwchat spaces fetch
+    lwchat spaces add eng spaces/AAAAYourSpaceID
+
+EXAMPLES:
+    lwchat find 126270
+    lwchat read 126270 --json
+    lwchat reply 126270 "Deployed to staging"
+    lwchat threads --space eng
+`.trim();
+
+async function main() {
+  const args = process.argv.slice(2);
+
+  if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
+    console.log(HELP);
+    process.exit(0);
+  }
+
+  // Strip known global boolean flags so they never leak into positional args
+  // (e.g. `reply <id> "msg" --json` must not append "--json" to the message).
+  // Value-flags like --space / --client-id are NOT global; their command
+  // handlers consume them positionally, so they stay in cleanArgs.
+  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive"]);
+  const json = args.includes("--json");
+  const caseSensitive = args.includes("--case-sensitive");
+  let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a));
+
+  // Pull a value-flag (e.g. --space eng) out of the args and
+  // return its value plus the args with the flag+value removed. Used so the
+  // flag never leaks into positional args like the reply message.
+  const popFlag = (name) => {
+    const i = cleanArgs.indexOf(name);
+    if (i === -1) return undefined;
+    const value = cleanArgs[i + 1];
+    cleanArgs = cleanArgs.slice(0, i).concat(cleanArgs.slice(i + 2));
+    return value;
+  };
+  const spaceFlag = popFlag("--space");
+  const threadFlag = popFlag("--thread");
+  const spacesFlag = popFlag("--spaces"); // comma-separated list
+  const limitFlag = popFlag("--limit");
+
+  const cmd = cleanArgs[0];
+  const sub = cleanArgs[1];
+
+  try {
+    switch (cmd) {
+      case "auth":
+        if (sub === "login") {
+          await cmdAuthLogin(cleanArgs.slice(2));
+        } else if (sub === "status") {
+          await cmdAuthStatus(json);
+        } else {
+          console.error("Usage: lwchat auth [login|status]");
+          process.exit(1);
+        }
+        break;
+
+      case "doctor":
+        await cmdDoctor(json);
+        break;
+
+      case "me":
+        await cmdMe(cleanArgs.slice(1), json);
+        break;
+
+      case "spaces":
+        if (sub === "add") {
+          const alias = cleanArgs[2];
+          const spaceId = cleanArgs[3];
+          if (!alias || !spaceId) {
+            console.error("Usage: lwchat spaces add <alias> <space_id>");
+            process.exit(1);
+          }
+          await cmdSpacesAdd(alias, spaceId, json);
+        } else if (sub === "remove") {
+          const alias = cleanArgs[2];
+          if (!alias) {
+            console.error("Usage: lwchat spaces remove <alias>");
+            process.exit(1);
+          }
+          await cmdSpacesRemove(alias, json);
+        } else if (sub === "fetch") {
+          await cmdSpacesFetch(json);
+        } else {
+          await cmdSpaces(json);
+        }
+        break;
+
+      case "find": {
+        const issueId = cleanArgs[1];
+        if (!issueId) {
+          console.error("Usage: lwchat find <issue_id>");
+          process.exit(1);
+        }
+        await cmdFind(issueId, json);
+        break;
+      }
+
+      case "read": {
+        const issueId = cleanArgs[1];
+        if (!issueId) {
+          console.error("Usage: lwchat read <issue_id> [--space <alias>]");
+          process.exit(1);
+        }
+        await cmdRead(issueId, spaceFlag, json);
+        break;
+      }
+
+      case "reply": {
+        const issueId = cleanArgs[1];
+        const message = cleanArgs.slice(2).join(" ");
+        if (!issueId || !message) {
+          console.error('Usage: lwchat reply <issue_id> "message" [--space <alias>]');
+          process.exit(1);
+        }
+        await cmdReply(issueId, message, spaceFlag, json);
+        break;
+      }
+
+      case "post": {
+        const space = cleanArgs[1];
+        const message = cleanArgs.slice(2).join(" ");
+        if (!space || !message) {
+          console.error('Usage: lwchat post <space_alias|spaces/id> "message" [--thread <thread_name>]');
+          process.exit(1);
+        }
+        await cmdPost(space, message, threadFlag, json);
+        break;
+      }
+
+      case "dm": {
+        const user = cleanArgs[1];
+        const message = cleanArgs.slice(2).join(" ");
+        if (!user || !message) {
+          console.error('Usage: lwchat dm <email|name|users/id> "message"');
+          process.exit(1);
+        }
+        await cmdDm(user, message, json);
+        break;
+      }
+
+      case "warm":
+        await cmdWarm(json);
+        break;
+
+      case "directory": {
+        const refresh = cleanArgs.includes("--refresh");
+        const queryParts = cleanArgs.slice(1).filter((a) => a !== "--refresh");
+        const query = queryParts.join(" ");
+        if (!query) {
+          console.error("Usage: lwchat directory <name or email> [--refresh]");
+          process.exit(1);
+        }
+        await cmdDirectory(query, refresh, json);
+        break;
+      }
+
+      case "search": {
+        const term = cleanArgs.slice(1).join(" ");
+        if (!term) {
+          console.error('Usage: lwchat search <term> [--space <alias> | --spaces a,b,c] [--limit N] [--case-sensitive]');
+          process.exit(1);
+        }
+        const spaceList = spacesFlag ? spacesFlag.split(",").map((s) => s.trim()).filter(Boolean) : null;
+        const limit = limitFlag ? parseInt(limitFlag, 10) : 30;
+        await cmdSearch(term, { spaceAlias: spaceFlag, spaceList, limit, caseSensitive }, json);
+        break;
+      }
+
+      case "threads": {
+        await cmdThreads(spaceFlag, json);
+        break;
+      }
+
+      case "index": {
+        await cmdIndex(spaceFlag, json);
+        break;
+      }
+
+      case "cache":
+        await cmdCache(sub, json);
+        break;
+
+      case "members": {
+        if (sub === "refresh") {
+          await cmdMembersRefresh(spaceFlag, json);
+        } else {
+          await cmdMembers(spaceFlag, json);
+        }
+        break;
+      }
+
+      case "backup":
+        if (sub === "list") {
+          await cmdBackupList(json);
+        } else if (sub === "delete") {
+          const name = cleanArgs[2];
+          if (!name) {
+            console.error("Usage: lwchat backup delete <name>");
+            process.exit(1);
+          }
+          await cmdBackupDelete(name, json);
+        } else {
+          await cmdBackup(sub || undefined, json);
+        }
+        break;
+
+      case "restore": {
+        const name = cleanArgs[1];
+        await cmdRestore(name, json);
+        break;
+      }
+
+      default:
+        console.error(`Unknown command: ${cmd}`);
+        console.log(HELP);
+        process.exit(1);
+    }
+  } catch (e) {
+    if (json) {
+      console.log(JSON.stringify({ ok: false, error: e.message }));
+    } else {
+      console.error(`error: ${e.message}`);
+    }
+    process.exit(1);
+  }
+}
+
+main();

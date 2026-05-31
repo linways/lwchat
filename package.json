@@ -1,0 +1,19 @@
+{
+  "name": "lwchat",
+  "version": "0.1.0",
+  "description": "Standalone CLI to read and reply to Google Chat space threads linked to Redmine issues",
+  "type": "module",
+  "bin": {
+    "lwchat": "./bin/lwchat.js"
+  },
+  "scripts": {
+    "start": "node bin/lwchat.js",
+    "link": "npm link"
+  },
+  "keywords": ["google-chat", "redmine", "cli", "workspace"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}
