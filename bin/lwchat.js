@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
 import {
   cmdAuthLogin,
   cmdAuthStatus,
@@ -69,6 +73,8 @@ COMMANDS:
     backup  list                        List all backups
     backup  delete <name>               Delete a backup
     restore [name]                      Restore from backup (latest if no name)
+
+    uninstall                           Remove AI-tool symlinks + npm unlink (preserves ~/.lwchat/)
 
 FLAGS:
     --json          Machine-readable JSON output
@@ -293,6 +299,15 @@ async function main() {
       case "restore": {
         const name = cleanArgs[1];
         await cmdRestore(name, json);
+        break;
+      }
+
+      case "uninstall": {
+        // Shortcut for `node install.mjs uninstall` so users don't need to
+        // remember the repo path. install.mjs lives at the repo root; this
+        // binary lives at <repo>/bin/lwchat.js — one level up.
+        const installScript = resolve(dirname(fileURLToPath(import.meta.url)), "..", "install.mjs");
+        execFileSync("node", [installScript, "uninstall"], { stdio: "inherit" });
         break;
       }
 
