@@ -44,7 +44,7 @@ Every command takes `--json` and emits a stable schema for AI agents. Full comma
 ```bash
 git clone https://github.com/linways/lwchat.git ~/my-works/lwchat
 cd ~/my-works/lwchat
-node install.mjs install
+./install.sh
 ```
 
 That single command:
@@ -54,14 +54,16 @@ That single command:
 - Symlinks the snapshot into every detected AI tool: Claude Code, Codex CLI, Copilot CLI, Gemini Antigravity, Cursor
 - Grants Claude Code `Read(~/.lwchat/**)` and `Bash(lwchat:*)` so it never prompts mid-session
 
-Other lifecycle commands:
+Other lifecycle commands (from the repo root):
 
 | Command | What it does |
 |---|---|
-| `node install.mjs update` | Pull latest + re-link binary + refresh skill snapshot |
-| `node install.mjs install-skill` | Skill only — snapshot + symlink, skip binary re-link |
-| `node install.mjs status` | What's installed where, with freshness |
-| `node install.mjs uninstall` | Remove links + npm unlink (preserves `~/.lwchat` data) |
+| `./install.sh update` | Pull latest + re-link binary + refresh skill snapshot |
+| `./install.sh install-skill` | Skill only — snapshot + symlink, skip binary re-link |
+| `./install.sh status` | What's installed where, with freshness |
+| `./install.sh uninstall` | Remove links + npm unlink (preserves `~/.lwchat` data) |
+
+`node install.mjs <cmd>` also works for any of the above.
 
 ---
 
