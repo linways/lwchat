@@ -212,7 +212,7 @@ Not implemented in v0.1.0 because there's no second org / second tracker to supp
 ---
 
 ## ADR-010: Don't request the `chat.memberships` write scope for DM creation
-**Date:** 2026-05-31 · **Status:** Accepted (revisitable)
+**Date:** 2026-05-31 · **Status:** **Superseded by ADR-013 (2026-05-31)** — the friction this ADR accepted ("open a DM in Chat once") turned out to be a real blocker for the agentic UX, so we added the write scope. Kept for context.
 
 ### Context
 
@@ -236,7 +236,7 @@ Requesting an additional write scope forces every user through another consent s
 ---
 
 ## ADR-011: Annotation-based member name resolution (not `spaces.members.list`)
-**Date:** 2026-05-26 · **Status:** Accepted
+**Date:** 2026-05-26 · **Status:** **Partially superseded by ADR-012 (2026-05-31)** — annotation scraping is now layer 2 of the resolver (fallback after the Directory API). The original reasoning still holds for users not in the org's directory (Chat apps, external members), so the code path stays.
 
 ### Context
 
@@ -258,6 +258,91 @@ Build the member map by scanning past messages for USER_MENTION annotations and 
 - **+** Names are the user-facing names exactly as Chat renders them
 - **−** Cold-start: empty map until the cache is built. Mitigated by background build on `members refresh` or first `reply`
 - **−** Coverage gap as noted above. Documented, not a blocker
+
+---
+
+## ADR-012: Add `directory.readonly` scope; layered name resolver
+**Date:** 2026-05-31 · **Status:** Accepted
+
+### Context
+
+`dm <name>` had two compounding limitations that surfaced when trying to DM Akshay K P:
+
+1. **`spaces.members.list` returns no `displayName` under user OAuth** — empirically confirmed. So the official roster API gave us the right *set* of users in a space but no names to identify them with.
+2. **Annotation scraping (ADR-011) only covered people @mentioned in recent messages.** Akshay had never been mentioned, so he was invisible to the name lookup even though he's an active org member.
+
+The People API `people:batchGet` with `personFields=names,emailAddresses` was tested — without the directory scope, it returns only `resourceName` + `etag`, no name fields. Useless for resolution at our scopes.
+
+### Decision
+
+Request **`https://www.googleapis.com/auth/directory.readonly`** in addition to the existing scopes. This unlocks:
+
+- **People API `people:searchDirectoryPeople`** — org-wide name search (powers `lwchat directory <query>`).
+- **People API `people:batchGet`** — returns real `displayName` values for `users/<id>` lookups (powers `members` and `read` sender resolution).
+
+Implement a **layered resolver** (`resolveUserRef` for `dm`, `buildSpaceMemberMap` for member maps), in order from most-authoritative to weakest:
+
+1. Already a `users/<id>` → use as-is.
+2. Contains `@` → email alias, `users/<email>`.
+3. **Directory API search/batch** (org-wide, with names) — needs `directory.readonly`.
+4. **Annotation cache** (ADR-011) — free fallback for users not in the directory (Chat apps, external members).
+5. Bare `users/<id>` — last-resort fallback so the map entry still exists.
+
+`getMemberMap` now treats `spaces.members.list` as the *source of truth for membership* (cheap, complete) and fills in names via the resolver above. This is the inverse of the v0.1.x behaviour, where annotations were both source-of-truth AND name source.
+
+### Reasoning
+
+The user told us explicitly: "if you think any other permission is needed just tell me." Re-shaping the design around a missing scope when a one-line addition solves the underlying problem is the wrong trade. The user-facing benefit (DM by name to anyone in the org, complete member maps, real sender names everywhere) is large; the cost is one extra consent screen and a slightly broader read authority.
+
+`directory.readonly` is a **read-only** scope — it only grants visibility into the user's existing Workspace directory. No write authority added.
+
+### Consequences
+
+- **+** `dm <name>` finds anyone at the org, not just people we've cached
+- **+** `members` returns the *real* roster with real names — Akshay K P appears even without annotations
+- **+** `read` sender names populate correctly from a clean install (no need to wait for the annotation cache to warm)
+- **+** New `lwchat directory <query>` command for org-wide lookup independent of spaces
+- **−** Re-auth required after upgrade (we're in dev, accepted)
+- **−** Slightly larger consent screen — but Workspace internal apps typically grant this automatically
+
+### What this didn't change
+
+- Annotation cache (ADR-011) stays as fallback layer 4 — still useful for Chat apps and external members who aren't in the org directory.
+- The cache file shape (`members.json`) didn't change; only how it's populated.
+
+---
+
+## ADR-013: Add `chat.memberships` (write) scope; auto-create DM spaces
+**Date:** 2026-05-31 · **Status:** Accepted · **Supersedes:** ADR-010
+
+### Context
+
+ADR-010 (same day) decided **against** requesting `chat.memberships` (write) — the rationale being that "open a DM in Chat once" is acceptable one-time friction. Almost immediately, while testing the new layered DM resolver, the friction landed: the agentic UX of `lwchat dm <new-person>` failing with a "go to Chat first" error breaks the entire promise of single-step command execution. The user invoked the standing rule ("if a scope solves it, just ask") and asked us to add the write scope.
+
+### Decision
+
+Request **`https://www.googleapis.com/auth/chat.memberships`** (write — note the absence of `.readonly`). This unlocks `spaces.setup` so a brand-new 1:1 DM space can be created when one doesn't exist.
+
+Implement `getOrCreateDmSpace(userId)` in `chat-api.js`:
+
+1. `findDirectMessage(userId)` → return on 200.
+2. On 404 → `spaces.setup` with `spaceType: DIRECT_MESSAGE` and the target user as the sole membership → return that.
+
+`cmdDm` now calls `getOrCreateDmSpace` directly. The "no existing DM, open in Chat first" error path is gone.
+
+### Reasoning
+
+- ADR-010's accepted friction turned out to be a real blocker for agent UX, not just a minor inconvenience.
+- The write scope is narrowly scoped to membership management (joining/leaving spaces, creating direct messages). It doesn't grant the ability to delete messages, read content beyond what other scopes allow, or modify other users' state.
+- We're in dev with a single user — re-auth cost is zero. For the eventual public release, "re-auth on upgrade" is a one-time message in the CHANGELOG.
+
+### Consequences
+
+- **+** `lwchat dm <anyone>` is now a single command end-to-end; no Chat UI step
+- **+** Aligns with the agentic-tool design principle ("commands should complete in one invocation")
+- **−** Consent screen is one line longer; broader authority requested
+- **−** Re-auth required after upgrade (CHANGELOG note in v0.1.2)
+- ADR-010 stays in the file as historical context, marked superseded.
 
 ---
 

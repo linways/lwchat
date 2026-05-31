@@ -14,6 +14,7 @@ import {
   cmdReply,
   cmdPost,
   cmdDm,
+  cmdDirectory,
   cmdSearch,
   cmdThreads,
   cmdIndex,
@@ -50,6 +51,7 @@ COMMANDS:
 
     post    <space> <message> [--thread <name>]  Post to a space; --thread replies to a specific thread
     dm      <user> <message>            DM a user (email/name/users/id) — existing DM space required
+    directory <query>                   Search the org directory (name → user id + email)
     search  <term> [--space <a> | --spaces a,b,c] [--limit N] [--case-sensitive]
                                         Search messages across configured spaces (client-side scan)
 
@@ -217,6 +219,16 @@ async function main() {
           process.exit(1);
         }
         await cmdDm(user, message, json);
+        break;
+      }
+
+      case "directory": {
+        const query = cleanArgs.slice(1).join(" ");
+        if (!query) {
+          console.error("Usage: lwchat directory <name or email>");
+          process.exit(1);
+        }
+        await cmdDirectory(query, json);
         break;
       }
 

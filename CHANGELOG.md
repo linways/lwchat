@@ -8,6 +8,48 @@ Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
+## [0.1.2] — 2026-05-31
+
+Adds two OAuth scopes that unlock org-wide member resolution and first-time DM creation. **Re-auth required after upgrade** — `lwchat auth login --client-id … --client-secret …` re-runs the consent flow with the new scopes. See [docs/DECISIONS.md ADR-012](docs/DECISIONS.md#adr-012-add-directoryreadonly-scope-layered-name-resolver) and [ADR-013](docs/DECISIONS.md#adr-013-add-chatmemberships-write-scope-auto-create-dm-spaces).
+
+Triggered by a real bug report: trying to `dm "Akshay K P"` failed because Akshay had never been @mentioned in any space we cache, and the v0.1.1 resolver only knew people from annotations. The diagnosis showed `spaces.members.list` returned no `displayName` under user OAuth, and `people:batchGet` returned no name fields without the directory scope. Conclusion: add `directory.readonly`; while we're at it, drop the "open DM in Chat first" friction by adding `chat.memberships`.
+
+### Added
+
+- **`lwchat directory <query>`** — org-wide People-API directory search. Returns `name`, `email`, `users/<id>`. JSON-friendly. Powers name → user-id lookups independent of which spaces you're in.
+- **`chat-api.js` Directory API helpers** — `searchDirectory(query)`, `peopleBatchGet(userIds)`. Both fail-soft (errors carry `.status` for clean caller handling).
+- **`chat-api.js` `listAllMembers(spaceId)`** — paginates `spaces.members.list` and returns the **real roster**. Replaces annotation-only membership in `getMemberMap`.
+- **`chat-api.js` `getOrCreateDmSpace(userId)`** — finds an existing 1:1 DM or creates one via `spaces.setup`. Single entry point for `cmdDm`.
+
+### Changed
+
+- **`auth.js`** — `CHAT_SCOPES` now includes `directory.readonly` and `chat.memberships` (write).
+- **`commands.js` `resolveUserRef`** — layered resolver: `users/<id>` → email → **Directory API** → annotation cache → bare ID. Replaces the annotation-only lookup that missed anyone not @mentioned recently.
+- **`commands.js` `getMemberMap`** — now uses `listAllMembers` as the source of truth for who's in a space, with names filled in by a Directory + annotation cascade. Previous behaviour silently dropped anyone never @mentioned.
+- **`commands.js` `cmdDm`** — replaces `findDirectMessage` with `getOrCreateDmSpace`; removes the "Open a DM in Chat once" error path.
+
+### Fixed
+
+- **Akshay K P (and anyone like him) is no longer invisible.** Real bug from the field, reproduced and verified fixed.
+- **Doc errata** — comments + ADRs no longer say "lwchat doesn't request `chat.memberships`" without distinguishing `.readonly` (which we had) from the write variant (now also requested).
+
+### Architecture decisions
+
+- **ADR-010** marked **superseded by ADR-013** — the "open a DM in Chat once" trade-off we accepted lasted half a day before real usage proved it was a blocker for agentic UX.
+- **ADR-011** marked **partially superseded by ADR-012** — annotation scraping is now fallback layer 4, not the primary resolver. The code path stays for users not in the org's directory.
+- **New ADR-012** — Directory API scope + layered resolver design.
+- **New ADR-013** — `chat.memberships` write scope + `getOrCreateDmSpace`.
+
+### Operational note
+
+A new standing rule, surfaced during this session and saved to project memory: **if a missing OAuth scope solves the underlying problem, just request it and re-auth; don't reach for workarounds**. The "what scopes do we have, what could we add" matrix in REVIEW.md (and this CHANGELOG entry) is the template.
+
+### Verified
+
+`lwchat doctor` 8 ok · 0 warn · 0 fail · 0 skip. `lwchat directory akshay` returns two matches with names + emails + IDs. `lwchat members refresh --space exam-controller` populated 22 members with their real Workspace names (was annotation-only / incomplete before).
+
+---
+
 ## [0.1.1] — 2026-05-31 (review branch)
 
 Codebase review pass on the `review/v0.1.x` branch. No behavioural change to the public commands or JSON shapes — just hygiene and small correctness fixes. See [docs/REVIEW.md](docs/REVIEW.md) for the full ranked plan; the items below are what landed on this branch.

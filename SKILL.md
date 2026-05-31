@@ -157,9 +157,23 @@ lwchat post <space> "<message>" --json                 # machine output
 lwchat dm <user> "<message>"   # user = email, full name, or users/<id>
 ```
 
-Resolution order: `users/<id>` used as-is → an `@`-containing string treated as an email (`users/<email>`) → otherwise looked up in cached members by name (full → first; ambiguous first names error with a hint).
+Resolution order (most specific first):
 
-**v1 limitation:** lwchat only requests Chat scopes — not `chat.memberships` — so it **can find an existing DM space but cannot create one.** If the target has no existing DM with you, the command errors with: *"Open a DM with them in Google Chat once, then retry."* This is intentional (avoids requesting a write scope just for first-time DMs).
+1. `users/<id>` → used as-is
+2. anything with `@` → treated as an email (`users/<email>`)
+3. **Directory API search** (org-wide) — finds anyone at the user's Workspace org by name, even people who share no space with you and were never @mentioned. Single exact match wins; multiple matches throw an ambiguity error listing the candidates.
+4. Aggregated annotation cache — fallback for users not in the org directory (e.g. Chat apps, external members)
+
+If the recipient has no existing DM space with the user, **lwchat creates one** via `spaces.setup` (requires the `chat.memberships` write scope, granted in v0.1.2 — see ADR-013). No "open Chat first" friction.
+
+### Org directory lookup
+
+```bash
+lwchat directory <query>          # human output
+lwchat directory <query> --json   # { ok, query, count, results: [{name, email, userId}] }
+```
+
+Search the user's Workspace directory for matching people. Returns `name`, `email`, and `users/<id>` — useful when you want a `users/<id>` to pass to other commands, or when you're not sure of the exact spelling. Independent of which spaces you're in.
 
 ### Search messages
 
