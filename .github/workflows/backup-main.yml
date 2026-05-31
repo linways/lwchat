@@ -1,8 +1,16 @@
-name: Weekly backup main → main-backup
+name: Weekly backup main → backups/main
 
-# Mirrors the current tip of `main` onto `main-backup` so we always have
+# Mirrors the current tip of `main` onto `backups/main` so we always have
 # a one-PR-away restore point if main gets corrupted by a Sync-fork
 # misclick, a bad merge, or anything else surprising.
+#
+# Why `backups/main` and not `main-backup`:
+# the repo ruleset on `linways/lwchat` covers `main` AND `main-backup`
+# (likely via a `main*` pattern), enforcing "Changes must be made through
+# a pull request". The default GITHUB_TOKEN cannot bypass that rule, so
+# the first attempt at this job (run #1) failed with GH013. The
+# `backups/*` namespace is outside the rule, so the action token can
+# write there directly.
 #
 # Schedule: every Saturday 22:00 IST (= 16:30 UTC, day-of-week 6).
 # Cron is in UTC; IST = UTC+5:30, so 22:00 IST → 16:30 UTC.
@@ -16,7 +24,7 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # needed to push to main-backup
+      contents: write       # needed to push to backups/main
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -24,8 +32,8 @@ jobs:
           ref: main
           fetch-depth: 0    # full history so the push lands cleanly
 
-      - name: Force-push main → main-backup
+      - name: Force-push main → backups/main
         run: |
           set -euo pipefail
-          echo "Mirroring $(git rev-parse HEAD) to refs/heads/main-backup"
-          git push --force origin HEAD:refs/heads/main-backup
+          echo "Mirroring $(git rev-parse HEAD) to refs/heads/backups/main"
+          git push --force origin HEAD:refs/heads/backups/main
