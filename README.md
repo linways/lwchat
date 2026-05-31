@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/cover.png" alt="lwchat" width="100%">
-</p>
-
 # lwchat
 
 > **lwchat** is a zero-dependency Node.js CLI that bridges your issue tracker (Redmine) and Google Chat: locate the thread for any issue, read the discussion, post replies with auto-resolved `@mentions`, send direct messages, and search across spaces — all from one terminal command, with first-class JSON output for AI agents.
@@ -17,11 +13,11 @@ Each Redmine issue at our team gets discussed in a Google Chat thread (the first
 ```bash
 lwchat find 126235                         # → which Chat thread(s) discuss this issue?
 lwchat read 126235                         # → show the full discussion, with sender names
-lwchat reply 126235 "deployed @Alice"      # → post back, with @mention auto-resolved
+lwchat reply 126235 "deployed @Ranjith"    # → post back, with @mention auto-resolved
 
 lwchat post myspace "Hi team"              # → top-level message to any space
 lwchat post myspace "..." --thread <name>  # → reply to any thread (not just Redmine)
-lwchat dm alice@example.com "ping"         # → DM by email/name/id
+lwchat dm sibin@linways.com "ping"         # → DM by email/name/id
 lwchat search "folio bug" --space cicd     # → client-side search across spaces
 
 lwchat me            # → who am I, which spaces am I in
@@ -94,19 +90,19 @@ lwchat me --refresh    # re-fetch identity + spaces
 ```bash
 # discover & alias spaces (one-time)
 lwchat spaces fetch
-lwchat spaces add eng spaces/AAAAYourSpaceID
+lwchat spaces add exam-controller spaces/AAAAdOaHhRY
 
 # Redmine ↔ Chat
 lwchat find 126235
 lwchat read 126235
 lwchat read 126235 --json | jq '.threads[].messages[].text'
-lwchat reply 126235 "deployed @Alice"
+lwchat reply 126235 "deployed @Ranjith"
 
 # Generic Chat
 lwchat post myspace "test"
 lwchat post myspace "answer" --thread spaces/.../threads/abc
 lwchat search "folio bug" --space cicd --limit 5
-lwchat dm alice@example.com "ping"
+lwchat dm sibin@linways.com "ping"
 
 # Operate
 lwchat doctor              # health check
@@ -124,7 +120,7 @@ Full command reference: see **[SKILL.md](SKILL.md)** (it's also what AI agents r
 | **[SKILL.md](SKILL.md)** | The agent contract — what every command does, JSON shapes, multi-space rules, safety guidance. Loaded automatically by every AI agent on this machine. |
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | How the system works inside — data dir layout, cache + TTL, multi-space resolution, mention engine, OAuth flow, install model. |
 | **[docs/DECISIONS.md](docs/DECISIONS.md)** | Architecture decision records (ADRs) — why a fork instead of a runtime overlay, why no JS plugin surface, why these scope choices, naming. |
-| **[docs/ROADMAP.md](docs/ROADMAP.md)** | What's done, what might come next, known limitations. |
+| **[docs/ROADMAP.md](docs/ROADMAP.md)** | What's done, what's next, the publish-and-fork plan, known limitations. |
 | **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | How to extend lwchat — project structure, conventions, "how do I add a new command" walkthrough, safe testing patterns. |
 | **[recipes/](recipes/)** | Agent patterns — gather-context, reply-patterns, post/dm/search workflows. |
 | **[CHANGELOG.md](CHANGELOG.md)** | Version history. |
@@ -165,8 +161,8 @@ Zero npm dependencies. Only Node.js stdlib: `http`, `fs`, `path`, `url`, `child_
 
 ## Status
 
-**v0.1.2** — see [CHANGELOG.md](CHANGELOG.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+**v0.1.0** — feature-complete for the Linways use case. See [CHANGELOG.md](CHANGELOG.md) and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
 
 ## License
 
-[MIT](LICENSE)
+MIT — see [LICENSE](LICENSE). Built by Sibin C Baby.

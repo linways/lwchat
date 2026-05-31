@@ -83,13 +83,13 @@ SETUP:
 
     # Then add spaces to search
     lwchat spaces fetch
-    lwchat spaces add eng spaces/AAAAYourSpaceID
+    lwchat spaces add exam-controller spaces/AAAAdOaHhRY
 
 EXAMPLES:
     lwchat find 126270
     lwchat read 126270 --json
     lwchat reply 126270 "Deployed to staging"
-    lwchat threads --space eng
+    lwchat threads --space exam-controller
 `.trim();
 
 async function main() {
@@ -109,7 +109,7 @@ async function main() {
   const caseSensitive = args.includes("--case-sensitive");
   let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a));
 
-  // Pull a value-flag (e.g. --space eng) out of the args and
+  // Pull a value-flag (e.g. --space exam-controller) out of the args and
   // return its value plus the args with the flag+value removed. Used so the
   // flag never leaks into positional args like the reply message.
   const popFlag = (name) => {

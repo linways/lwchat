@@ -2,9 +2,9 @@
 
 > Where lwchat is, where it's going, and what's deliberately out of scope. Cross-reference with [DECISIONS.md](DECISIONS.md) when something here would contradict an ADR.
 
-## Where we are: **v0.1.2** (current)
+## Where we are: **v0.1.0** (current)
 
-Feature-complete. Doctor reports 8/8 ok in a clean install. Verified end to end against a live Google Workspace org.
+Feature-complete for the Linways use case. Doctor reports 8/8 ok in a clean install. Verified end to end against a live Google Workspace org.
 
 ### Shipped commands
 
@@ -37,15 +37,51 @@ Feature-complete. Doctor reports 8/8 ok in a clean install. Verified end to end 
 
 ---
 
-## Adopting lwchat at your team
+## The publish-and-fork plan
 
-1. Fork or clone this repo.
-2. Add your tracker URL (`redmine_url_pattern` in `lib/config.js`).
-3. Add team-specific recipes alongside the generic ones in `recipes/`.
+The path from "feature-complete v0.1" to two published repos. Each step gates the next.
+
+### Phase 1 — keep building **here**, full-flavoured
+
+Continue developing Linways-specific use cases (`#qa_release`/`#prod_release` templates in recipes, mention guidelines in `org.md`, etc.) **in this repo** as a single working tree. No fork yet. This is the current phase.
+
+### Phase 2 — cut a `core` branch when stable
+
+When the working tree is solid and the user is ready to publish, cut a `core` branch and trim:
+
+| Remove | Replace with |
+|---|---|
+| Real names in `SKILL.md` (e.g. `@Ranjith Balachandran`) | placeholder (`@<reviewer>`) |
+| Real space IDs (e.g. `spaces/AAAAdOaHhRY`) | placeholder (`spaces/<your-space-id>`) |
+| `#prod_release` / `#qa_release` examples | generic "post a status update" example |
+| Linways-specific recipes (`recipes/reply-patterns.md` org content) | generic reply-safety guidance only |
+| Default `redmine_url_pattern: "redmine.linways.com/issues/"` | placeholder or empty (config-required) |
+| `feedbacks/` dir (real names, real `users/<id>`) | delete |
+| Linways examples in README quickstart | generic examples |
+
+The `core` branch becomes the basis of the public repo.
+
+### Phase 3 — publish to personal GitHub, freeze
+
+1. `git push -u origin core` (or rebase `core` onto `main` first, your call)
+2. Push to **the user's personal GitHub repo** (`github.com/<user>/lwchat`)
+3. Tag `v0.1.0-core` and **freeze** — no further commits to that repo (see [ADR-008](DECISIONS.md#adr-008-frozen-public-core--linways-fork-for-ongoing-work))
+4. README + LICENSE clearly attribute to the user
+
+### Phase 4 — fork to Linways
+
+1. Create a **new Linways-org GitHub repo** (e.g. `github.com/linways/lwchat` or wherever org code lives)
+2. Push the **full Linways-flavoured tree from this working repo** (not the core branch) as the initial Linways commit
+3. Keep a `UPSTREAM.md` or footer link that credits the personal repo as origin
+4. All ongoing Linways feature work happens in the Linways repo from here on
+
+### Phase 5 — ongoing development
+
+In the Linways repo. No further changes to the public personal repo (per ADR-008).
 
 ---
 
-## What might come next (speculative)
+## What's next (post-v0.1.0)
 
 Numbered by likelihood / value, **not** by promise.
 
@@ -61,7 +97,7 @@ Numbered by likelihood / value, **not** by promise.
 ### Mid term
 
 7. **CI / test harness** — currently the test surface is "run lwchat doctor + post to myspace + verify in Chat UI." A unit test scaffold (no network) for the pure-logic pieces (`extractIssueId`, `resolveMentions`, `normalizeLocations`, `freshestTs`) would catch regressions.
-8. **`spaces export` / `spaces import`** — let a fork ship a known-good `default_spaces` set as a JSON file that users can `lwchat spaces import org-spaces.json`.
+8. **`spaces export` / `spaces import`** — let a fork ship a known-good `default_spaces` set as a file users can `lwchat spaces import linways.json`.
 9. **Reactions** — `lwchat react <message> :thumbsup:` for acknowledgement workflows. The Chat API supports `messages.reactions.create`.
 10. **Threading metadata** — `lwchat thread show <thread_name>` to dump everything about a thread including participants, age, last activity.
 

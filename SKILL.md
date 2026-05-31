@@ -18,7 +18,7 @@ This file is the operational contract. For background:
 
 - **`docs/ARCHITECTURE.md`** in the repo — module map, data-dir layout, cache mechanics, mention engine, OAuth flow.
 - **`docs/DECISIONS.md`** — ADRs covering every consequential design choice (multi-space safety, no JS plugins, why a fork instead of a runtime overlay, scope minimalism, naming).
-- **`docs/ROADMAP.md`** — what's done, current state of this published core, known limits.
+- **`docs/ROADMAP.md`** — what's done, what's next, the frozen-core + Linways-fork publishing plan, known limits.
 - **`docs/DEVELOPMENT.md`** — how to add a command without breaking conventions.
 - **`recipes/`** — composable patterns (`gather-context`, `reply-patterns`, `generic-chat`).
 
@@ -98,13 +98,13 @@ Returns messages chronologically, sender IDs resolved to names. If the issue is 
   "count": 1,
   "threads": [
     {
-      "space_alias": "eng",
-      "thread": "spaces/AAAAYourSpaceID/threads/abc123XYZ",
+      "space_alias": "exam-controller",
+      "thread": "spaces/AAAAdOaHhRY/threads/j7YSIlbB5jc",
       "message_count": 5,
       "messages": [
         {
-          "sender": "users/100000000000000000001",
-          "sender_name": "Alice Smith",
+          "sender": "users/117334358123398955954",
+          "sender_name": "Muhammed Rameez",
           "sender_type": "HUMAN",
           "text": "the actual message text",
           "created": "2026-05-25T07:43:57.913327Z",
@@ -122,13 +122,13 @@ Returns messages chronologically, sender IDs resolved to names. If the issue is 
 lwchat reply <issue_id> "<message>" [--space <alias>] [--json]
 ```
 
-Posts a threaded reply. **@mentions are auto-resolved** — write `@Alice` or `@Alice Smith` and lwchat converts the name to the proper `<users/ID>` mention syntax (first name or full name; `@all` mentions everyone). The resolved text is shown before sending.
+Posts a threaded reply. **@mentions are auto-resolved** — write `@Krishnakumar` or `@Ranjith Balachandran` and lwchat converts the name to the proper `<users/ID>` mention syntax (first name or full name; `@all` mentions everyone). The resolved text is shown before sending.
 
 **Multi-space safety:** if the issue exists in more than one space, `reply` **refuses to post** without `--space <alias>` (so a message never lands in the wrong space). `find` first to see the options.
 
 **Use cases:**
-- Status update: `lwchat reply 12345 "deployed to production @Alice"`
-- Targeted: `lwchat reply 12345 "verified" --space eng`
+- Status update: `lwchat reply 126270 "#prod_release — deployed to production @Ranjith"`
+- Targeted: `lwchat reply 126270 "verified" --space exam-controller`
 
 > Never reply on the user's behalf without explicit permission. Show what will be posted first.
 
@@ -140,7 +140,7 @@ lwchat post <space> "<message>" --thread <thread_name> # reply to any thread (Re
 lwchat post <space> "<message>" --json                 # machine output
 ```
 
-`<space>` accepts a configured alias (`eng`) or a raw `spaces/<id>`. With `--thread`, the message goes as a threaded reply to the named thread (use this when you have a thread name from `threads --json` or `search --json` and the thread isn't tied to a Redmine issue).
+`<space>` accepts a configured alias (`exam-controller`) or a raw `spaces/<id>`. With `--thread`, the message goes as a threaded reply to the named thread (use this when you have a thread name from `threads --json` or `search --json` and the thread isn't tied to a Redmine issue).
 
 **JSON shape:**
 ```json
@@ -191,8 +191,8 @@ Both `members.json` and the `directory_cache` carry a 7-day TTL — member lists
 
 ```bash
 lwchat search <term>                                    # scan default_spaces
-lwchat search <term> --space eng                        # one space
-lwchat search <term> --spaces eng,ops                   # comma-separated subset
+lwchat search <term> --space exam-controller            # one space
+lwchat search <term> --spaces exam-controller,cicd      # comma-separated subset
 lwchat search <term> --limit 50                         # default 30
 lwchat search <term> --case-sensitive                   # default is case-insensitive substring
 lwchat search <term> --json                             # structured
@@ -202,9 +202,9 @@ Google Chat has **no server-side full-text search**, so this is a bounded client
 
 **JSON shape:**
 ```json
-{ "ok": true, "term": "...", "scope": ["eng"], "count": 3, "limit": 30,
-  "results": [{ "space_alias": "eng", "thread": "spaces/.../threads/...",
-                 "sender_name": "Alice Smith", "created": "2026-05-23T08:01:24.128703Z",
+{ "ok": true, "term": "...", "scope": ["exam-controller"], "count": 3, "limit": 30,
+  "results": [{ "space_alias": "exam-controller", "thread": "spaces/.../threads/...",
+                 "sender_name": "Lakshmi Nandakumar", "created": "2026-05-23T08:01:24.128703Z",
                  "snippet": "...", "is_reply": false }] }
 ```
 

@@ -74,7 +74,7 @@ The user asked whether the cache could go stale and return old messages. Real co
 
 ### Context
 
-The original cache shape was `issue_id → { single space, single thread }`. The user discovered that the same Redmine issue is sometimes cross-posted in multiple spaces (e.g. a "dev" space and an "ops" space). The old shape silently overwrote — a `reply` could land in the wrong space.
+The original cache shape was `issue_id → { single space, single thread }`. The user discovered that the same Redmine issue is sometimes cross-posted in multiple spaces (dev-analysis *and* exam-controller, for instance). The old shape silently overwrote — a `reply` could land in the wrong space.
 
 ### Decision
 
@@ -160,30 +160,31 @@ Mixed naming existed: command was `lw-chat`, data dir was `~/.lwchat`, package w
 
 ---
 
-## ADR-008: Two-repo publishing model
+## ADR-008: Frozen public core + Linways fork for ongoing work
 **Date:** 2026-05-30 · **Status:** Accepted
 
 ### Context
 
-The author wants to publish lwchat as an open-source project, *and* continue evolving org-specific use cases internally. Two repos with different cadences.
+The user wants to publish lwchat to their personal GitHub for portfolio/community use, *and* continue evolving the Linways-specific use cases. Two repos with different cadences.
 
 ### Decision
 
-1. Build the **org-flavoured** working tree in a private branch.
-2. When stable, extract a **portable subset** of the tree (placeholder defaults, anonymised names + IDs, generic recipe templates) to a separate public repository.
-3. The public repository is the published artefact; internal work continues on its own branch with org-specific defaults.
-4. Attribution flows one way — both copies credit the original author (LICENSE, README, package.json `author`).
+1. Build the **full Linways-flavoured** lwchat in this repo (current state).
+2. When stable, cut a `core` branch and trim Linways-specific values (real names, real space IDs, `#prod_release` strings, the `feedbacks/` dir, the default `redmine.linways.com` URL pattern).
+3. Publish the trimmed `core` branch as the user's **personal GitHub repo** and **freeze** it.
+4. Create a **separate Linways repo** as a fork from the frozen personal repo. All ongoing Linways work happens there.
+5. Credit/attribution always points back to the personal repo (LICENSE, README, package.json `author`).
 
 ### Reasoning
 
-Considered an alternative data-only overlay model but it would have required a two-step install (engine plus overlay), which we vetoed in favour of a single-step install.
+The "frozen core" assumption removes the classic fork-merge-cost problem: with no upstream changes, there is nothing to merge back into the fork. We considered an alternative data-only overlay model but it would have required a two-step install for Linways users (core *plus* overlay), which the user vetoed. See conversation history 2026-05-30 for the full debate.
 
 ### Consequences
 
-- **+** Single-step install for users of either tree
-- **+** Public repository is a clean portfolio/showcase, free of org-specific data
-- **−** If the published version ever needs a security fix or bug fix, both trees need updating. Acceptable: lwchat's surface is narrow
-- **−** Each tree carries all the install machinery a fork would. Cost is essentially zero
+- **+** Single-step install for Linways users (one repo)
+- **+** Public repo is a clean portfolio/showcase
+- **−** If the core ever needs a security fix or bug fix later, we'd have to update both repos. Acceptable: lwchat's surface is narrow and v0.1 is intended to be stable
+- **−** Linways repo carries all the install machinery a downstream fork would, even though "no one is forking it" in practice. Cost is essentially zero
 
 ---
 
@@ -265,7 +266,7 @@ Build the member map by scanning past messages for USER_MENTION annotations and 
 
 ### Context
 
-`dm <name>` had two compounding limitations that surfaced when trying to DM a colleague by name:
+`dm <name>` had two compounding limitations that surfaced when trying to DM Akshay K P:
 
 1. **`spaces.members.list` returns no `displayName` under user OAuth** — empirically confirmed. So the official roster API gave us the right *set* of users in a space but no names to identify them with.
 2. **Annotation scraping (ADR-011) only covered people @mentioned in recent messages.** Akshay had never been mentioned, so he was invisible to the name lookup even though he's an active org member.
@@ -298,7 +299,7 @@ The user told us explicitly: "if you think any other permission is needed just t
 ### Consequences
 
 - **+** `dm <name>` finds anyone at the org, not just people we've cached
-- **+** `members` returns the *real* roster with real names — every org member appears even without annotations
+- **+** `members` returns the *real* roster with real names — Akshay K P appears even without annotations
 - **+** `read` sender names populate correctly from a clean install (no need to wait for the annotation cache to warm)
 - **+** New `lwchat directory <query>` command for org-wide lookup independent of spaces
 - **−** Re-auth required after upgrade (we're in dev, accepted)
@@ -379,7 +380,7 @@ A separate observation: **member rosters are stable.** New members get added "on
 - **+** Login takes a few seconds longer (one-time, with progress); every subsequent command is cache-hot.
 - **+** Code is meaningfully simpler — the resolver is 4 layers but layer 4 is a tiny lookup against the same Directory-sourced data, not a separate scrape.
 - **+** Race condition (silent data loss when warming concurrently) eliminated.
-- **−** lwchat without `directory.readonly` (admin-disabled Workspace or a personal Google account) no longer gets name resolution at all. **Documented limitation; revisitable** — the annotation path can be re-introduced behind a config flag if needed for orgs that lock down directory access.
+- **−** lwchat without `directory.readonly` (admin-disabled Workspace or a personal Google account) no longer gets name resolution at all. **Documented limitation; revisitable** — the public-core trim can re-introduce the annotation path behind a config flag if it ships to orgs that lock down directory access. For Linways, every member is in the directory, so this case never occurs.
 - **−** TTL bump means a colleague who joins today won't be findable by `dm <name>` until the user runs `lwchat warm`. Acceptable: the message has a clear path to refresh (`lwchat warm`), and login auto-warms.
 
 ---

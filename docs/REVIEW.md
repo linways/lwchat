@@ -218,7 +218,7 @@ Pick the throw path; `afterLogin` already catches `generateMe` errors.
 
 ### P2.7 — Unicode-aware mention regex
 
-`resolveMentions` uses `[A-Za-z]+`. Names with diacritics (`Mañuel`, `Müller`) don't match — a real gap for any team with non-ASCII names. Add `u` flag and use `\p{L}`:
+`resolveMentions` uses `[A-Za-z]+`. Names with diacritics (`Mañuel`, `Müller`) don't match. Not relevant for the Linways org today, but a real limitation for the public core. Add `u` flag and use `\p{L}`:
 
 ```js
 text.replace(/@(\p{L}+(?:\s+\p{L}+)?(?:\s+\p{L}+)?)/gu, …)
@@ -291,4 +291,4 @@ The rule for each step: doctor stays 8/8, no JSON shape changes, every existing 
 
 - This review was written in one pass. Any P2 / P3 items deferred can be revisited the same way — read the file, weigh value × safety, decide.
 - ADRs in `docs/DECISIONS.md` are the contract. If a "fix" here ever contradicts an ADR, **read the ADR first** — it usually captures the constraint the obvious fix would break.
-- The `feedbacks/` dir (if present in a downstream tree) holds historical bug notes that should not be included in any portable release.
+- The `feedbacks/` dir holds historical bug notes. It's excluded from the eventual public-core trim (see ROADMAP.md §3).

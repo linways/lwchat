@@ -12,7 +12,7 @@ Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Adds two OAuth scopes that unlock org-wide member resolution and first-time DM creation. **Re-auth required after upgrade** — `lwchat auth login --client-id … --client-secret …` re-runs the consent flow with the new scopes. See [docs/DECISIONS.md ADR-012](docs/DECISIONS.md#adr-012-add-directoryreadonly-scope-layered-name-resolver) and [ADR-013](docs/DECISIONS.md#adr-013-add-chatmemberships-write-scope-auto-create-dm-spaces).
 
-Triggered by a real bug report: trying to `dm` a colleague by name failed because they had never been @mentioned in any space we cache, and the v0.1.1 resolver only knew people from annotations. The diagnosis showed `spaces.members.list` returned no `displayName` under user OAuth, and `people:batchGet` returned no name fields without the directory scope. Conclusion: add `directory.readonly`; while we're at it, drop the "open DM in Chat first" friction by adding `chat.memberships`.
+Triggered by a real bug report: trying to `dm "Akshay K P"` failed because Akshay had never been @mentioned in any space we cache, and the v0.1.1 resolver only knew people from annotations. The diagnosis showed `spaces.members.list` returned no `displayName` under user OAuth, and `people:batchGet` returned no name fields without the directory scope. Conclusion: add `directory.readonly`; while we're at it, drop the "open DM in Chat first" friction by adding `chat.memberships`.
 
 ### Added
 
@@ -30,7 +30,7 @@ Triggered by a real bug report: trying to `dm` a colleague by name failed becaus
 
 ### Fixed
 
-- **Anyone in the org directory is now findable by name, even if never @mentioned.** Real bug from the field, reproduced and verified fixed.
+- **Akshay K P (and anyone like him) is no longer invisible.** Real bug from the field, reproduced and verified fixed.
 - **Doc errata** — comments + ADRs no longer say "lwchat doesn't request `chat.memberships`" without distinguishing `.readonly` (which we had) from the write variant (now also requested).
 
 ### Architecture decisions
@@ -58,7 +58,7 @@ A new standing rule, surfaced during this session and saved to project memory: *
 ### Changed (post-Directory)
 
 - **TTL bumped to 7 days** for both `members.json` rosters and `directory_cache`. Member lists "rarely change" (user feedback); honest TTL stops forced redundant work.
-- **Annotation name scrape removed entirely.** `buildMemberMap` deleted from `chat-api.js`. `buildSpaceMemberMap` now consults only `listAllMembers` + `peopleBatchGet`. **Warm time dropped 17.4s → 1.3s** (13×). See ADR-014 — annotations can be re-introduced behind a config flag if used in orgs that lock directory access.
+- **Annotation name scrape removed entirely.** `buildMemberMap` deleted from `chat-api.js`. `buildSpaceMemberMap` now consults only `listAllMembers` + `peopleBatchGet`. **Warm time dropped 17.4s → 1.3s** (13×). For the public-core trim, see ADR-014 — annotations can be re-introduced behind a config flag if shipped to orgs that lock directory access.
 
 ### Architecture decisions (post-Directory)
 
@@ -67,7 +67,7 @@ A new standing rule, surfaced during this session and saved to project memory: *
 
 ### Verified
 
-`lwchat doctor` 8 ok · 0 warn · 0 fail · 0 skip. `lwchat directory <query>` returns matches with names + emails + IDs (first call ~0.6s live, subsequent calls ~0.05s cached). `lwchat warm` covered all configured spaces in ~1.3s — was 17.4s before the annotation removal. `lwchat cache show` reports all three cache sections.
+`lwchat doctor` 8 ok · 0 warn · 0 fail · 0 skip. `lwchat directory akshay` returns two matches with names + emails + IDs (first call ~0.6s live, subsequent calls ~0.05s cached). `lwchat warm` covers all 7 spaces / 196 members in 1.3s — was 17.4s before the annotation removal. `lwchat cache show` reports all three cache sections.
 
 ---
 
@@ -167,7 +167,7 @@ First feature-complete release. Verified end-to-end against a live Google Worksp
 
 - New `docs/ARCHITECTURE.md` — module map, data dir layout, cache mechanics, multi-space semantics, mention engine, auth flow, install model.
 - New `docs/DECISIONS.md` — ADRs covering every consequential design choice with reasoning.
-- New `docs/ROADMAP.md` — current state, possible future work, out-of-scope list, known limitations.
+- New `docs/ROADMAP.md` — current state, publishing plan (frozen-core + Linways fork), out-of-scope list, known limitations, "what to do next" guide for a future Claude session.
 - New `docs/DEVELOPMENT.md` — project structure, conventions, "how to add a command" walkthrough, debugging tips, code-style.
 - `SKILL.md` rewritten as the agent contract — every command, JSON shape, multi-space rule, safety guidance, links into the deeper docs.
 - New `recipes/` patterns for gather-context and reply / post / dm / search workflows.

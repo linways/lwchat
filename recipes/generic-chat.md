@@ -5,7 +5,7 @@ description: Patterns for using lwchat's generic Chat surface — posting to spa
 
 # Generic Chat patterns (post / dm / search)
 
-When the request isn't tied to a Redmine issue — "send a message to the eng space," "ask Alice something," "find that thread where someone mentioned the migration bug" — use these.
+When the request isn't tied to a Redmine issue — "send a message to the cicd space," "ask Krishnakumar something," "find that thread where someone mentioned the folio bug" — use these.
 
 ## Post a top-level message to a space
 
@@ -13,14 +13,14 @@ When the request isn't tied to a Redmine issue — "send a message to the eng sp
 lwchat post <space> "<message>"
 ```
 
-`<space>` accepts an alias (`eng`) or raw `spaces/<id>`. A top-level post creates a new thread.
+`<space>` accepts an alias (`exam-controller`) or raw `spaces/<id>`. A top-level post creates a new thread.
 
 Example:
 ```bash
-lwchat post eng "Deploy at 4 PM today @Alice Smith"
+lwchat post cicd "Deploy at 4 PM today @Hamy Paul K"
 ```
 
-The `@Alice Smith` gets resolved to a real `<users/<id>>` mention before posting (aggregated member map across all cached spaces; the Directory API resolves names org-wide). If the resolved text differs, lwchat prints it before sending so you can verify.
+The `@Hamy Paul K` gets resolved to a real `<users/<id>>` mention before posting (aggregated member map across all cached spaces). If the resolved text differs, lwchat prints it before sending so you can verify.
 
 ## Reply to any thread (not just Redmine-linked)
 
@@ -28,7 +28,7 @@ The `@Alice Smith` gets resolved to a real `<users/<id>>` mention before posting
 lwchat post <space> "<message>" --thread <thread_name>
 ```
 
-The `thread_name` is the resource name like `spaces/AAAAYourSpaceID/threads/abc123XYZ`. Get one from:
+The `thread_name` is the resource name like `spaces/AAAAdOaHhRY/threads/abcXYZ`. Get one from:
 
 - `lwchat search "<term>" --json | jq '.results[0].thread'`
 - `lwchat threads --space <alias> --json | jq '.[0].thread'`
@@ -36,7 +36,7 @@ The `thread_name` is the resource name like `spaces/AAAAYourSpaceID/threads/abc1
 
 Example — react in-thread to a search hit:
 ```bash
-RESULT=$(lwchat search "migration bug" --space eng --json)
+RESULT=$(lwchat search "folio bug" --space cicd --json)
 THREAD=$(echo "$RESULT" | jq -r '.results[0].thread')
 SPACE=$(echo "$RESULT" | jq -r '.results[0].space_alias')
 lwchat post "$SPACE" "I'll take a look — assigning myself" --thread "$THREAD"
@@ -55,9 +55,9 @@ lwchat dm <user> "<message>"
 
 Examples:
 ```bash
-lwchat dm alice@example.com "ping — got a sec?"
-lwchat dm "Alice Smith" "have you seen issue #126287?"
-lwchat dm users/100000000000000000001 "raw id works too"
+lwchat dm sibin@linways.com "ping — got a sec?"
+lwchat dm Krishnakumar "have you seen issue #126287?"
+lwchat dm users/115337869562783395702 "raw id works too"
 ```
 
 ### v1 limitation: existing DM required
@@ -74,8 +74,8 @@ This is intentional ([ADR-010](../docs/DECISIONS.md#adr-010-dont-request-the-cha
 
 ```bash
 lwchat search "<term>"                                    # default_spaces
-lwchat search "<term>" --space eng                        # one space
-lwchat search "<term>" --spaces eng,ops                   # comma-separated subset
+lwchat search "<term>" --space exam-controller            # one space
+lwchat search "<term>" --spaces exam-controller,cicd      # comma-separated subset
 lwchat search "<term>" --limit 50                         # default 30
 lwchat search "<term>" --case-sensitive                   # default is insensitive
 lwchat search "<term>" --json                             # structured
@@ -129,6 +129,6 @@ If you're orchestrating a multi-step workflow that includes a post, surface the 
 
 ## See also
 
-- [reply-patterns.md](reply-patterns.md) — illustrative reply templates for status updates, dev-analysis notes, blockers, etc.
+- [reply-patterns.md](reply-patterns.md) — when to reply with `#prod_release`, dev-analysis notes, etc.
 - [gather-context.md](gather-context.md) — combining Redmine + Chat context for an issue
 - [docs/ARCHITECTURE.md §7](../docs/ARCHITECTURE.md#7-posting-model) — the API primitives behind these commands

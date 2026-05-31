@@ -66,13 +66,13 @@ Every path is a constant in `lib/config.js`. New runtime files belong in this tr
 ```jsonc
 {
   "spaces": {                                 // alias → space resource name
-    "eng":     "spaces/AAAAYourEngID",
-    "ops":     "spaces/AAAAYourOpsID"
+    "exam-controller": "spaces/AAAAdOaHhRY",
+    "myspace":          "spaces/AAAAI_WLIUo"
   },
   "default_spaces": [                          // ordered scan list for find/index/search
-    "eng", "ops"
+    "exam-controller", "academics", "dev-analysis"
   ],
-  "redmine_url_pattern": "redmine.example.com/issues/",
+  "redmine_url_pattern": "redmine.linways.com/issues/",
   "cache_ttl_seconds": 300,                    // thread-location cache freshness window
   "page_limit": 20                             // max pages scanned per space (100 msgs/pg)
 }
@@ -88,15 +88,15 @@ Default values live in `DEFAULT_CONFIG` (`lib/config.js`). Missing keys fall bac
 
 ```jsonc
 {
-  "12345": {                                        // ← issue id
-    "eng": {                                        // ← space alias
-      "space":         "spaces/AAAAYourEngID",
-      "thread":        "spaces/AAAAYourEngID/threads/abc123XYZ",
-      "space_alias":   "eng",
-      "first_message": "Bug - Example issue subject - https://redmine.example.com/issues/12345",
-      "indexed_at":    "2026-01-01T06:11:56.939Z"
+  "126235": {                                       // ← issue id
+    "exam-controller": {                            // ← space alias
+      "space":         "spaces/AAAAdOaHhRY",
+      "thread":        "spaces/AAAAdOaHhRY/threads/a8PR5cEXXjg",
+      "space_alias":   "exam-controller",
+      "first_message": "Christ ijk - Bug - Subject Not Listing...",
+      "indexed_at":    "2026-05-29T06:11:56.939Z"
     },
-    "ops": { ... }                                  // ← issue cross-posted to a 2nd space
+    "dev-analysis": { ... }                         // ← issue cross-posted to a 2nd space
   }
 }
 ```
@@ -156,7 +156,7 @@ A 24 h TTL applies to `members.json`. `lwchat members refresh` forces a rebuild.
 ### Resolution policy (text → `<users/<id>>` substitution)
 
 1. `@all` → literal `<users/all>` (Chat's everyone-mention)
-2. Try matching 1-, 2-, then 3-word names against the cached full-name map (longer matches win — `@Alice Marie Smith` wins over `@Alice`)
+2. Try matching 1-, 2-, then 3-word names against the cached full-name map (longer matches win — `@Hamy Paul K` wins over `@Hamy`)
 3. Fall back to a first-name lookup. **If the first name is ambiguous across the org, leave the literal text alone** (silent no-op — never pick the wrong person)
 
 For `post` and `dm` the member map used is the **union across every cached space's members.json**, since these commands aren't scoped to a single space's roster.
@@ -170,7 +170,7 @@ extractIssueId(text, pattern) =
   text.match(new RegExp(escapeRegex(pattern) + "(\\d+)"))?.[1] ?? null
 ```
 
-With `pattern = "redmine.example.com/issues/"`, this extracts the issue number from any URL like `https://redmine.example.com/issues/12345`. To make `find` test whether a *specific* issue ID `N` is referenced, we run the extractor on the message and compare strings: `extractIssueId(text, pattern) === String(N)`. This is correct (full-digit capture prevents `123450` being mistaken for `12345`) and config-driven (changing `redmine_url_pattern` rewires the entire matching path).
+With `pattern = "redmine.linways.com/issues/"`, this extracts the issue number from any URL like `https://redmine.linways.com/issues/126235`. To make `find` test whether a *specific* issue ID `N` is referenced, we run the extractor on the message and compare strings: `extractIssueId(text, pattern) === String(N)`. This is correct (full-digit capture prevents `1262350` being mistaken for `126235`) and config-driven (changing `redmine_url_pattern` rewires the entire matching path).
 
 `reply` then targets the cached `{space, thread}` and calls `messages.create` with the `thread.name` set — that's the only Redmine-specific code path in the entire tool.
 

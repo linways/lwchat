@@ -163,7 +163,7 @@ lwchat doesn't have a unit-test harness yet (see [ROADMAP](ROADMAP.md) candidate
 1. **`lwchat doctor`** — the runtime self-test. 6 sections, exits non-zero on failure. Run after every code change.
 2. **`myspace`** — the user's solo space, configured as the alias `myspace`. Posting here verifies the full pipeline (auth → API → mention resolution → message sent) without bothering anyone.
 3. **Self-DM error path** — `lwchat dm <your-own-email>` is *expected* to error with `"No existing DM space with users/..."`. This confirms the resolution + findDirectMessage path without sending a real DM.
-4. **Search against known terms** — `lwchat search "<term known to exist>" --limit 3 --space <alias>` exercises pagination + matching + sender-name resolution.
+4. **Search against known terms** — `lwchat search "<term known to exist>" --limit 3 --space exam-controller` exercises pagination + matching + sender-name resolution.
 5. **JSON shape sanity** — pipe `--json` output through `node -e 'JSON.parse(...)'` to confirm shape.
 
 Until there's a proper unit-test harness, **every PR should include a paste of the relevant commands and their output**, including `lwchat doctor`, in the description.
