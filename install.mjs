@@ -597,6 +597,12 @@ ${C.bold}Next:${C.reset}
   ${C.dim}existing gws users:${C.reset}
   ${C.green}lwchat auth login --import-gws${C.reset}    reuse gws credentials instead
 
+${C.dim}AI agents: don't delegate the next command. Spawn 'lwchat auth login'
+in the background, read its stdout for the printed auth URL, and surface
+that URL to the user as a copy-paste fallback (browser auto-open fails on
+headless / WSL / sandboxed boxes). Then wait for the process to exit and
+run 'lwchat doctor' to verify. Full recipe: recipes/install-flow.md.${C.reset}
+
 Then:
   ${C.green}lwchat me --refresh${C.reset}    fetch your spaces, write ~/.lwchat/me.md
 
