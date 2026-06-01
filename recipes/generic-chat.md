@@ -11,7 +11,7 @@ When the request isn't tied to a Redmine issue — "send a message to the cicd s
 
 ```bash
 lwchat post <space> "<message>"
-lwchat post <space> "<message>" --image <local-file>   # attach a file
+lwchat post <space> "<message>" --attach <local-file>   # attach a file
 ```
 
 `<space>` accepts an alias (`exam-controller`) or raw `spaces/<id>`. A top-level post creates a new thread.
@@ -19,17 +19,17 @@ lwchat post <space> "<message>" --image <local-file>   # attach a file
 Example:
 ```bash
 lwchat post cicd "Deploy at 4 PM today @Hamy Paul K"
-lwchat post cicd "Release notes for v2.4.0" --image ./release-notes.pdf
-lwchat post myspace "before/after of the bug fix" --image ~/Pictures/repro.png
+lwchat post cicd "Release notes for v2.4.0" --attach ./release-notes.pdf
+lwchat post myspace "before/after of the bug fix" --attach ~/Pictures/repro.png
 ```
 
 The `@Hamy Paul K` gets resolved to a real `<users/<id>>` mention before posting (aggregated member map across all cached spaces). If the resolved text differs, lwchat prints it before sending so you can verify.
 
-### `--image` notes
+### `--attach` notes
 
 - Takes a **local file path**, not a URL. lwchat uploads the bytes to the Chat space and attaches them.
 - Chat renders images inline (png/jpg/gif/webp/bmp/svg) when the MIME map detects them. Anything else (zip, mp4, .docx, ...) uploads fine and shows as a download chip.
-- URLs are **not** supported as values for `--image`. Google Chat blocks `cards`/`cardsV2` payloads for messages sent with human-OAuth credentials, so the URL-via-cardsV2 path is architecturally impossible. If you want to share a URL of a hosted image, just include it in the text — Chat auto-link-previews most image URLs.
+- URLs are **not** supported as values for `--attach`. Google Chat blocks `cards`/`cardsV2` payloads for messages sent with human-OAuth credentials, so the URL-via-cardsV2 path is architecturally impossible. If you want to share a URL of a hosted image, just include it in the text — Chat auto-link-previews most image URLs.
 - Works the same with `--thread` (attach to a threaded reply), or on `reply` and `dm` (same flag, same behaviour).
 
 ## Reply to any thread (not just Redmine-linked)
@@ -56,7 +56,7 @@ lwchat post "$SPACE" "I'll take a look — assigning myself" --thread "$THREAD"
 
 ```bash
 lwchat dm <user> "<message>"
-lwchat dm <user> "<message>" --image <local-file>   # attach a file
+lwchat dm <user> "<message>" --attach <local-file>   # attach a file
 ```
 
 `<user>` resolution order:
@@ -64,7 +64,7 @@ lwchat dm <user> "<message>" --image <local-file>   # attach a file
 2. Anything containing `@` — treated as an email (`users/<email>`)
 3. A name — looked up in the aggregated member map (full name → first name)
 
-`--image` works on DMs too — useful for sharing a screenshot directly with someone instead of in a public space. Same constraints as `post --image` (local path, not URL).
+`--attach` works on DMs too — useful for sharing a screenshot directly with someone instead of in a public space. Same constraints as `post --attach` (local path, not URL).
 
 Examples:
 ```bash
