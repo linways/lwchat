@@ -123,10 +123,12 @@ Returns messages chronologically, sender IDs resolved to names. If the issue is 
 ### Reply to a thread
 
 ```bash
-lwchat reply <issue_id> "<message>" [--space <alias>] [--json]
+lwchat reply <issue_id> "<message>" [--space <alias>] [--image <local-file>] [--json]
 ```
 
 Posts a threaded reply. **@mentions are auto-resolved** — write `@Krishnakumar` or `@Ranjith Balachandran` and lwchat converts the name to the proper `<users/ID>` mention syntax (first name or full name; `@all` mentions everyone). The resolved text is shown before sending.
+
+`--image` (optional): attach a local file (screenshot, repro, PDF, etc.). lwchat uploads the file to the same space as the thread and attaches it to the reply. Same constraints as `post --image` — local paths only, not URLs. See the `post` section below for the why.
 
 **Multi-space safety:** if the issue exists in more than one space, `reply` **refuses to post** without `--space <alias>` (so a message never lands in the wrong space). `find` first to see the options.
 
@@ -161,8 +163,10 @@ lwchat post <space> "<message>" --json                     # machine output
 ### Direct message a person
 
 ```bash
-lwchat dm <user> "<message>"   # user = email, full name, or users/<id>
+lwchat dm <user> "<message>" [--image <local-file>]
 ```
+
+`<user>` = email, full name, or `users/<id>`. `--image` (optional) attaches a local file to the DM — uploaded to the DM space, same behaviour as `post --image`.
 
 Resolution order (most specific first):
 

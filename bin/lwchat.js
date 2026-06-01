@@ -52,11 +52,13 @@ COMMANDS:
 
     find    <issue_id>                  Find the issue's thread(s) — reports every space it's in
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
-    reply   <issue_id> <message> [--space <a>]  Reply; --space required when issue spans spaces
+    reply   <issue_id> <message> [--space <a>] [--image <local-path>]
+                                        Reply; --space required when issue spans spaces; --image uploads + attaches a local file
 
     post    <space> <message> [--thread <name>] [--image <local-path>]
                                         Post to a space; --thread replies to a specific thread; --image uploads + attaches a local file (URLs not supported — Google Chat blocks cards for human OAuth)
-    dm      <user> <message>            DM a user (email/name/users/id); auto-creates DM if needed
+    dm      <user> <message> [--image <local-path>]
+                                        DM a user (email/name/users/id); auto-creates DM if needed; --image uploads + attaches a local file
     directory <query> [--refresh]       Search the org directory (cached 24h)
     warm                                Pre-fetch all configured spaces' members + names (cache hot)
     search  <term> [--space <a> | --spaces a,b,c] [--limit N] [--case-sensitive]
@@ -203,10 +205,10 @@ async function main() {
         const issueId = cleanArgs[1];
         const message = cleanArgs.slice(2).join(" ");
         if (!issueId || !message) {
-          console.error('Usage: lwchat reply <issue_id> "message" [--space <alias>]');
+          console.error('Usage: lwchat reply <issue_id> "message" [--space <alias>] [--image <local-path>]');
           process.exit(1);
         }
-        await cmdReply(issueId, message, spaceFlag, json);
+        await cmdReply(issueId, message, spaceFlag, imageFlag, json);
         break;
       }
 
@@ -225,10 +227,10 @@ async function main() {
         const user = cleanArgs[1];
         const message = cleanArgs.slice(2).join(" ");
         if (!user || !message) {
-          console.error('Usage: lwchat dm <email|name|users/id> "message"');
+          console.error('Usage: lwchat dm <email|name|users/id> "message" [--image <local-path>]');
           process.exit(1);
         }
-        await cmdDm(user, message, json);
+        await cmdDm(user, message, imageFlag, json);
         break;
       }
 
