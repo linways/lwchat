@@ -132,7 +132,20 @@ async function main() {
   const threadFlag = popFlag("--thread");
   const spacesFlag = popFlag("--spaces"); // comma-separated list
   const limitFlag = popFlag("--limit");
-  const imageFlag = popFlag("--image"); // path or http(s) URL — for `post`
+  const imageFlag = popFlag("--image"); // local file path — for `post` / `reply` / `dm`
+
+  // Dangling-flag detection: `lwchat post sp "msg" --image` (no value
+  // after) leaves popFlag returning undefined, and the message would
+  // otherwise post WITHOUT the attachment the user clearly intended.
+  // Disambiguate "flag absent" from "flag present but valueless" by
+  // checking the original args. Match the rest of the CLI's error
+  // shape — emit JSON when --json is set, plain stderr otherwise.
+  if (imageFlag === undefined && args.includes("--image")) {
+    const msg = "--image needs a value (local file path). Got nothing after --image.";
+    if (json) console.log(JSON.stringify({ ok: false, error: msg }));
+    else console.error(`error: ${msg}`);
+    process.exit(1);
+  }
 
   const cmd = cleanArgs[0];
   const sub = cleanArgs[1];
