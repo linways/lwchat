@@ -52,10 +52,13 @@ COMMANDS:
 
     find    <issue_id>                  Find the issue's thread(s) — reports every space it's in
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
-    reply   <issue_id> <message> [--space <a>]  Reply; --space required when issue spans spaces
+    reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
+                                        Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
-    post    <space> <message> [--thread <name>]  Post to a space; --thread replies to a specific thread
-    dm      <user> <message>            DM a user (email/name/users/id); auto-creates DM if needed
+    post    <space> <message> [--thread <name>] [--attach <local-path>]
+                                        Post to a space; --thread replies to a specific thread; --attach uploads + attaches a local file (URLs not supported — Google Chat blocks cards for human OAuth)
+    dm      <user> <message> [--attach <local-path>]
+                                        DM a user (email/name/users/id); auto-creates DM if needed; --attach uploads + attaches a local file
     directory <query> [--refresh]       Search the org directory (cached 24h)
     warm                                Pre-fetch all configured spaces' members + names (cache hot)
     search  <term> [--space <a> | --spaces a,b,c] [--limit N] [--case-sensitive]
@@ -129,6 +132,20 @@ async function main() {
   const threadFlag = popFlag("--thread");
   const spacesFlag = popFlag("--spaces"); // comma-separated list
   const limitFlag = popFlag("--limit");
+  const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
+
+  // Dangling-flag detection: `lwchat post sp "msg" --attach` (no value
+  // after) leaves popFlag returning undefined, and the message would
+  // otherwise post WITHOUT the attachment the user clearly intended.
+  // Disambiguate "flag absent" from "flag present but valueless" by
+  // checking the original args. Match the rest of the CLI's error
+  // shape — emit JSON when --json is set, plain stderr otherwise.
+  if (attachFlag === undefined && args.includes("--attach")) {
+    const msg = "--attach needs a value (local file path). Got nothing after --attach.";
+    if (json) console.log(JSON.stringify({ ok: false, error: msg }));
+    else console.error(`error: ${msg}`);
+    process.exit(1);
+  }
 
   const cmd = cleanArgs[0];
   const sub = cleanArgs[1];
@@ -201,10 +218,10 @@ async function main() {
         const issueId = cleanArgs[1];
         const message = cleanArgs.slice(2).join(" ");
         if (!issueId || !message) {
-          console.error('Usage: lwchat reply <issue_id> "message" [--space <alias>]');
+          console.error('Usage: lwchat reply <issue_id> "message" [--space <alias>] [--attach <local-path>]');
           process.exit(1);
         }
-        await cmdReply(issueId, message, spaceFlag, json);
+        await cmdReply(issueId, message, spaceFlag, attachFlag, json);
         break;
       }
 
@@ -212,10 +229,10 @@ async function main() {
         const space = cleanArgs[1];
         const message = cleanArgs.slice(2).join(" ");
         if (!space || !message) {
-          console.error('Usage: lwchat post <space_alias|spaces/id> "message" [--thread <thread_name>]');
+          console.error('Usage: lwchat post <space_alias|spaces/id> "message" [--thread <thread_name>] [--attach <local-path>]');
           process.exit(1);
         }
-        await cmdPost(space, message, threadFlag, json);
+        await cmdPost(space, message, threadFlag, attachFlag, json);
         break;
       }
 
@@ -223,10 +240,10 @@ async function main() {
         const user = cleanArgs[1];
         const message = cleanArgs.slice(2).join(" ");
         if (!user || !message) {
-          console.error('Usage: lwchat dm <email|name|users/id> "message"');
+          console.error('Usage: lwchat dm <email|name|users/id> "message" [--attach <local-path>]');
           process.exit(1);
         }
-        await cmdDm(user, message, json);
+        await cmdDm(user, message, attachFlag, json);
         break;
       }
 
