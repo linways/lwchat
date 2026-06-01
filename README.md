@@ -75,9 +75,33 @@ Other lifecycle commands (from the repo root):
 lwchat auth login
 ```
 
-A browser opens, the user signs in with their `@linways.com` Google account and grants consent on the lwchat OAuth screen. The CLI prints `Authorization successful.` and writes `~/.lwchat/tokens.json` (mode 0600). No Cloud Console setup required — lwchat ships with a bundled OAuth client for the Linways Workspace (Internal consent screen, so no "unverified app" warning).
+This starts a loopback OAuth flow with PKCE — opens a browser for sign-in, catches the callback on `localhost:<random-port>`, exchanges the code for tokens, and writes `~/.lwchat/tokens.json` (mode `0600`). The CLI then auto-generates `~/.lwchat/me.md` (identity + every space the user is in, with member counts and last-active timestamps) and auto-aliases the user's spaces.
 
-After login, lwchat auto-generates `~/.lwchat/me.md` (identity + every space the user is in, with member counts and last-active timestamps) and auto-aliases their spaces.
+No Cloud Console setup required — lwchat ships with a bundled OAuth client for the Linways Workspace (Internal consent screen, so no "unverified app" warning).
+
+### If you're an AI agent walking a user through install
+
+**Don't tell the user to "type `lwchat auth login` yourself" — you can run it.** The skill file describing this is registered into your tooling by `./install.sh`, but it only takes effect on your *next* session, so during this very session you need the recipe right here in the README.
+
+**Run `lwchat auth login` as a background process**, then surface the printed auth URL to the user as a copy-paste fallback in case the browser auto-open fails (headless server, WSL without WSLg, remote SSH without X11, sandboxed containers — all common):
+
+```text
+# Claude Code's Bash tool:
+Bash("lwchat auth login", run_in_background: true)
+```
+
+(Codex / Copilot / Cursor have equivalent non-blocking-shell flags — the pattern is the same.)
+
+Then:
+
+1. Spawn the command in the background. The CLI prints `Open this URL in your browser to authenticate:` followed by the URL within 1–2 seconds.
+2. Read stdout, capture the URL, **show it to the user prominently** as the copy-paste fallback. The URL works from any browser anywhere — pasting it reaches the same loopback.
+3. Wait for the background process to exit. Typical 15–60s; the CLI's own timeout is 120s.
+4. Verify with `lwchat doctor` (expect `8 ok / 0 fail`).
+
+Foreground (`Bash("lwchat auth login")` without `run_in_background`) blocks your loop for up to 2 minutes and makes you look frozen. Don't do that.
+
+Full agent install recipe with anti-patterns and error-handling: **[`recipes/install-flow.md`](recipes/install-flow.md)**.
 
 ### Advanced: bring your own Cloud project
 
