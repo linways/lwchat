@@ -20,7 +20,7 @@ This file is the operational contract. For background:
 - **`docs/DECISIONS.md`** — ADRs covering every consequential design choice (multi-space safety, no JS plugins, why a fork instead of a runtime overlay, scope minimalism, naming).
 - **`docs/ROADMAP.md`** — what's done, what's next, the frozen-core + Linways-fork publishing plan, known limits.
 - **`docs/DEVELOPMENT.md`** — how to add a command without breaking conventions.
-- **`recipes/`** — composable patterns (`gather-context`, `reply-patterns`, `generic-chat`).
+- **`recipes/`** — composable patterns (`install-flow`, `gather-context`, `reply-patterns`, `generic-chat`).
 
 ---
 
@@ -46,12 +46,15 @@ node install.mjs install
 ```
 This links the `lwchat` binary, snapshots this skill to `~/.lwchat/skill/`, symlinks it into detected AI tools, and grants Claude Code `Read(~/.lwchat/**)`.
 
-**Authenticate** — the user runs this, not you (it opens a browser for sign-in + consent):
-> `lwchat auth login`
+**Authenticate** — you (the agent) run this, in the background, and surface the printed URL to the user:
 
-That uses the bundled Linways Workspace OAuth client — no flags needed for normal use. Power users with their own Cloud project pass `--client-id <id> --client-secret <secret>`; existing `gws` users can pass `--import-gws` to reuse those credentials.
+> `lwchat auth login` — spawn with `run_in_background: true` in Claude Code's Bash tool (equivalent in Codex/Copilot). DO NOT run it foreground — it blocks for up to 120s waiting for the OAuth callback and your loop will appear frozen. DO NOT tell the user to "type this yourself" — that's a handoff, you can handle it.
 
-After login, `lwchat` auto-generates `~/.lwchat/me.md` and auto-configures spaces. Verify with `lwchat auth status` or the full `lwchat doctor`.
+The CLI prints `Open this URL in your browser to authenticate:` followed by the auth URL, then tries to launch the user's browser via `xdg-open`/`open`/`start`. Read that URL from stdout and **show it to the user as a copy-paste fallback** — auto-open fails in headless/WSL-without-WSLg/locked-sandbox contexts. The CLI exits when the loopback callback fires; verify success with `lwchat doctor` (expect 8/8 ok).
+
+Uses the bundled Linways Workspace OAuth client by default — no flags needed. `--client-id <id> --client-secret <secret>` for a BYO Cloud project; `--import-gws` reuses `gws` CLI creds if present.
+
+After login, `lwchat` auto-generates `~/.lwchat/me.md` and auto-aliases spaces. Full walkthrough: [recipes/install-flow.md](recipes/install-flow.md).
 
 **Installer lifecycle** (`node install.mjs <cmd>`): `install`, `update` (code + skill), `install-skill` / `update-skill` (skills only), `status` (what's installed where), `uninstall` (removes links + npm unlink, preserves `~/.lwchat` data).
 
