@@ -54,7 +54,8 @@ COMMANDS:
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
     reply   <issue_id> <message> [--space <a>]  Reply; --space required when issue spans spaces
 
-    post    <space> <message> [--thread <name>]  Post to a space; --thread replies to a specific thread
+    post    <space> <message> [--thread <name>] [--image <local-path>]
+                                        Post to a space; --thread replies to a specific thread; --image uploads + attaches a local file (URLs not supported — Google Chat blocks cards for human OAuth)
     dm      <user> <message>            DM a user (email/name/users/id); auto-creates DM if needed
     directory <query> [--refresh]       Search the org directory (cached 24h)
     warm                                Pre-fetch all configured spaces' members + names (cache hot)
@@ -129,6 +130,7 @@ async function main() {
   const threadFlag = popFlag("--thread");
   const spacesFlag = popFlag("--spaces"); // comma-separated list
   const limitFlag = popFlag("--limit");
+  const imageFlag = popFlag("--image"); // path or http(s) URL — for `post`
 
   const cmd = cleanArgs[0];
   const sub = cleanArgs[1];
@@ -212,10 +214,10 @@ async function main() {
         const space = cleanArgs[1];
         const message = cleanArgs.slice(2).join(" ");
         if (!space || !message) {
-          console.error('Usage: lwchat post <space_alias|spaces/id> "message" [--thread <thread_name>]');
+          console.error('Usage: lwchat post <space_alias|spaces/id> "message" [--thread <thread_name>] [--image <local-path>]');
           process.exit(1);
         }
-        await cmdPost(space, message, threadFlag, json);
+        await cmdPost(space, message, threadFlag, imageFlag, json);
         break;
       }
 

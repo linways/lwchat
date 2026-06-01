@@ -139,12 +139,15 @@ Posts a threaded reply. **@mentions are auto-resolved** — write `@Krishnakumar
 ### Post a message to a space (non-Redmine)
 
 ```bash
-lwchat post <space> "<message>"                       # new top-level message (new thread)
-lwchat post <space> "<message>" --thread <thread_name> # reply to any thread (Redmine or not)
-lwchat post <space> "<message>" --json                 # machine output
+lwchat post <space> "<message>"                            # new top-level message (new thread)
+lwchat post <space> "<message>" --thread <thread_name>     # reply to any thread (Redmine or not)
+lwchat post <space> "<message>" --image <local-file-path>  # attach an uploaded image/file
+lwchat post <space> "<message>" --json                     # machine output
 ```
 
 `<space>` accepts a configured alias (`exam-controller`) or a raw `spaces/<id>`. With `--thread`, the message goes as a threaded reply to the named thread (use this when you have a thread name from `threads --json` or `search --json` and the thread isn't tied to a Redmine issue).
+
+`--image` takes a **local file path** (not a URL). lwchat uploads the file to the Chat space via the media-upload endpoint and attaches it to the message — Chat renders images inline. URLs are not supported: Google Chat blocks `cards`/`cardsV2` payloads for messages sent with human OAuth credentials, which is what lwchat uses. If you want to share a hosted image's URL, just include it in the text — Chat auto-link-previews most image URLs anyway.
 
 **JSON shape:**
 ```json
