@@ -107,7 +107,7 @@ Commands:
   status         Show what's installed where, with freshness
   uninstall      Remove binary link + skill symlinks (preserves ~/.lwchat user data)
 
-After install, run:  lwchat auth login --import-gws   (or --client-id/--client-secret)
+After install, run:  lwchat auth login    (uses the bundled Linways OAuth client; opens a browser)
 For a runtime health check (auth, network, config): lwchat doctor
 `);
 }
@@ -593,15 +593,15 @@ function humanAge(ms) {
 function printNextSteps() {
   console.log(`
 ${C.bold}Next:${C.reset}
-  ${C.green}lwchat auth login --import-gws${C.reset}    reuse gws credentials (one-time)
-  ${C.dim}or:${C.reset}
-  ${C.green}lwchat auth login --client-id <id> --client-secret <secret>${C.reset}
+  ${C.green}lwchat auth login${C.reset}    opens a browser; uses the bundled Linways OAuth client
+  ${C.dim}existing gws users:${C.reset}
+  ${C.green}lwchat auth login --import-gws${C.reset}    reuse gws credentials instead
 
 Then:
   ${C.green}lwchat me --refresh${C.reset}    fetch your spaces, write ~/.lwchat/me.md
 
 ${C.bold}When the repo updates:${C.reset}
-  ${C.green}node install.mjs update${C.reset}
+  ${C.green}./install.sh update${C.reset}
 `);
 }
 

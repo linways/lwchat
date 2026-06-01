@@ -71,34 +71,37 @@ Other lifecycle commands (from the repo root):
 
 ## Step 2: First-time Google auth
 
-lwchat needs an OAuth client for Google Chat + People APIs. Two paths — pick one.
+```bash
+lwchat auth login
+```
 
-### A) Fresh OAuth client
+A browser opens, the user signs in with their `@linways.com` Google account and grants consent on the lwchat OAuth screen. The CLI prints `Authorization successful.` and writes `~/.lwchat/tokens.json` (mode 0600). No Cloud Console setup required — lwchat ships with a bundled OAuth client for the Linways Workspace (Internal consent screen, so no "unverified app" warning).
 
-This is the path an agent should walk a new user through. Most of these are clicks in the Google Cloud Console.
+After login, lwchat auto-generates `~/.lwchat/me.md` (identity + every space the user is in, with member counts and last-active timestamps) and auto-aliases their spaces.
 
-1. **Create a Cloud project** (or reuse one): https://console.cloud.google.com/projectcreate
-2. **Enable APIs:** [Google Chat API](https://console.cloud.google.com/apis/library/chat.googleapis.com) and [People API](https://console.cloud.google.com/apis/library/people.googleapis.com).
-3. **OAuth consent screen:** User type *Internal* (Workspace) or *External* (gmail); App name `lwchat`.
-4. **Credentials → Create OAuth client ID → Application type *Desktop app*.** Copy the `client_id` and `client_secret`.
-5. **Chat API → Configuration:** App name `lwchat`, Pub/Sub topic name `projects/<your-project-id>/topics/lwchat` (topic does not need to exist), Save.
-6. Run:
+### Advanced: bring your own Cloud project
 
-   ```bash
-   lwchat auth login --client-id <CLIENT_ID> --client-secret <CLIENT_SECRET>
-   ```
+If you've forked lwchat for use outside Linways (or want to isolate quota / abuse exposure for your own org), create your own Desktop OAuth client and pass it on the command line:
 
-   A browser opens, you sign in and grant consent, the CLI prints `Authorization successful.` and you're done.
+```bash
+lwchat auth login --client-id <CLIENT_ID> --client-secret <CLIENT_SECRET>
+```
 
-### B) Import from gws CLI
+Steps to create the client:
+
+1. Create / reuse a Cloud project: https://console.cloud.google.com/projectcreate
+2. Enable the [Google Chat API](https://console.cloud.google.com/apis/library/chat.googleapis.com) and [People API](https://console.cloud.google.com/apis/library/people.googleapis.com).
+3. OAuth consent screen: *Internal* (Workspace) or *External*; App name `lwchat`.
+4. Credentials → Create OAuth client ID → Application type *Desktop app*; copy `client_id` and `client_secret`.
+5. Chat API → Configuration: App name `lwchat`, Pub/Sub topic `projects/<your-project-id>/topics/lwchat` (topic doesn't need to exist).
+
+### Existing `gws` users
 
 If the user already has [`gws`](https://github.com/googleworkspace/cli) authenticated, you can reuse its credentials in one command:
 
 ```bash
 lwchat auth login --import-gws
 ```
-
-After either path, lwchat auto-generates `~/.lwchat/me.md` (identity + every space the user is in, with member counts and last-active timestamps) and auto-aliases their spaces.
 
 ---
 

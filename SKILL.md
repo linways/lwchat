@@ -46,9 +46,10 @@ node install.mjs install
 ```
 This links the `lwchat` binary, snapshots this skill to `~/.lwchat/skill/`, symlinks it into detected AI tools, and grants Claude Code `Read(~/.lwchat/**)`.
 
-**Authenticate** — the user runs this, not you:
-> Run `lwchat auth login --import-gws` (reuse existing gws credentials)
-> or `lwchat auth login --client-id <id> --client-secret <secret>` in a separate terminal.
+**Authenticate** — the user runs this, not you (it opens a browser for sign-in + consent):
+> `lwchat auth login`
+
+That uses the bundled Linways Workspace OAuth client — no flags needed for normal use. Power users with their own Cloud project pass `--client-id <id> --client-secret <secret>`; existing `gws` users can pass `--import-gws` to reuse those credentials.
 
 After login, `lwchat` auto-generates `~/.lwchat/me.md` and auto-configures spaces. Verify with `lwchat auth status` or the full `lwchat doctor`.
 
