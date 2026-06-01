@@ -107,7 +107,7 @@ THREAD=$(lwchat search "..." --json | jq -r '.results[0].thread')
 SPACE=$(lwchat search "..." --json | jq -r '.results[0].space_alias')
 SPACE_ID=$(jq -r ".spaces[\"$SPACE\"]" ~/.lwchat/config.json)
 node -e "
-  import('/home/$USER/my-works/lwchat/lib/chat-api.js').then(async ({listThreadMessages}) => {
+  import('/path/to/lwchat/lib/chat-api.js').then(async ({listThreadMessages}) => {
     const r = await listThreadMessages('$SPACE_ID', '$THREAD');
     console.log(JSON.stringify(r.messages, null, 2));
   });

@@ -42,10 +42,12 @@ Every command takes `--json` and emits a stable schema for AI agents. Full comma
 ## Step 1: Install
 
 ```bash
-git clone https://github.com/linways/lwchat.git ~/my-works/lwchat
-cd ~/my-works/lwchat
+git clone https://github.com/linways/lwchat.git
+cd lwchat
 ./install.sh
 ```
+
+(Clone into whatever directory you prefer — the installer resolves paths from its own location, so the repo can live anywhere.)
 
 That single command:
 

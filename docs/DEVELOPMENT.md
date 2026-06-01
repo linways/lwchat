@@ -193,7 +193,7 @@ When unit tests land, those are the obvious first targets.
 The cleanest pattern, used throughout this codebase, is a one-liner with the auth helper:
 
 ```bash
-cd ~/my-works/lwchat
+cd <your lwchat clone>
 node -e "
   import('./lib/auth.js').then(async ({requireAuth}) => {
     const token = await requireAuth();
