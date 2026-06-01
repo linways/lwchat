@@ -1,0 +1,26 @@
+# Gitleaks configuration.
+#
+# Allowlists the bundled Linways OAuth client (Cloud project lwchat-498010,
+# Desktop type) committed to lib/auth.js by design. See SECURITY.md
+# ("Not in scope") and docs/DECISIONS.md ADR-015 for the why.
+#
+# Allowlist by VALUE, not by path — a broad lib/auth.js suppression would
+# hide a real future leak. Matching only the two known intentional values
+# keeps the scanner useful for everything else.
+
+title = "lwchat — gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlist]]
+description = "Bundled Linways OAuth client_id (Desktop type, intentional)"
+regexes = [
+  '''10594035390-2e5q6aqglhn6b3ju60927e05e8jg1224\.apps\.googleusercontent\.com''',
+]
+
+[[allowlist]]
+description = "Bundled Linways OAuth client_secret (Desktop type, intentional)"
+regexes = [
+  '''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''',
+]

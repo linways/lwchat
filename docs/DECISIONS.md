@@ -385,6 +385,41 @@ A separate observation: **member rosters are stable.** New members get added "on
 
 ---
 
+## ADR-015: Bundle OAuth `client_id` + `client_secret`; PKCE for defense-in-depth
+**Date:** 2026-06-01 · **Status:** Accepted
+
+### Context
+
+Through ADR-011 → ADR-014 the auth flow was UX-correct (`lwchat auth login --client-id <id> --client-secret <secret>`) but required every new user to walk through 5+ Google Cloud Console screens (create project, enable APIs, configure consent screen, create Desktop OAuth client, configure the Chat API tab) before they could even start. Asking an AI agent to walk a human through Cloud Console for a "just install this tool" request burns most of the agentic-install goodwill we were trying to capture.
+
+gcloud, gh, doppler, supabase, and basically every CLI that talks to a SaaS API ships with a bundled OAuth client. The user types one command and a browser opens. The catch for Google specifically: the "Desktop app" client type still requires `client_secret` in the token exchange — Google has no PKCE-only public-client flow for native apps the way GitHub does. So either we ship both `client_id` AND `client_secret`, or we keep asking users to BYO Cloud project.
+
+### Decision
+
+1. **Bundle `DEFAULT_CLIENT_ID` and `DEFAULT_CLIENT_SECRET`** from the Linways Workspace project (`lwchat-498010`, Internal consent screen) directly in [`lib/auth.js`](../lib/auth.js). `cmdAuthLogin` falls back to these when `--client-id` / `--client-secret` aren't passed.
+2. **Keep `--client-id` / `--client-secret` as an override.** Anyone forking lwchat outside Linways, or wanting to isolate quota / abuse exposure to their own Cloud project, can still pass them explicitly.
+3. **Add PKCE (RFC 7636, S256) on top of the bundled secret.** One pair per login attempt: `code_challenge` in the authorize URL, `code_verifier` in the token exchange. The verifier never leaves the lwchat process — it lives in memory for the ~30 seconds the flow takes, then gets garbage-collected.
+4. **Document the security model publicly** in [`SECURITY.md`](../SECURITY.md) so a stranger seeing the embedded secret on GitHub immediately knows it's deliberate, not leaked, with the gcloud/gh precedent right there.
+5. **Add scanner allowlists** ([`.gitguardian.yaml`](../.gitguardian.yaml), [`.gitleaks.toml`](../.gitleaks.toml)) that match only the two known intentional values. Never broadly suppress `lib/auth.js` — a real secret added there later should still trigger.
+
+### Reasoning
+
+- **Why bundling is OK.** Google's own native-app OAuth doc says: *"Although the client_secret is generally considered confidential, the client_secret for installed applications is not."* The real security boundary is the loopback redirect URI: only a process running on the same machine as the consenting user can complete the flow.
+- **Why PKCE matters MORE once the secret is public.** An attacker who has the embedded secret AND intercepts an authorization code (e.g., via a compromised browser extension or a malicious redirect handler) could otherwise redeem it. PKCE closes that hole: redemption now also requires the per-attempt `code_verifier` that only the original lwchat process held in memory.
+- **Why Internal consent screen.** No "unverified app" warning for `@linways.com` users; no need for Google's CASA security review (which is required for sensitive scopes like `directory.readonly` + `chat.memberships` on External consent screens). Forks for other orgs would create their own External or Internal client depending on their context — that's exactly what the `--client-id` / `--client-secret` override is for.
+- **Why allowlist by value, not by path.** A `lib/auth.js`-wide suppression would hide a real future leak (a misplaced secret in some new code path). Matching only the two known intentional values keeps the scanner useful for everything else.
+
+### Consequences
+
+- **+** Install UX collapses from 5+ Cloud Console screens to `lwchat auth login`. Agent-driven installs no longer need to walk a user through the consent screen flow.
+- **+** PKCE is in place even if Google later changes Desktop-app policy to allow secret-less flows — we'd just drop the `client_secret` parameter and ship a minor release.
+- **+** SECURITY.md gives auditors and curious readers a clear "this is intentional" signal with citations, instead of leaving them to guess.
+- **−** Linways's Cloud project is now the OAuth front door for every install. Quota and any abuse-related suspension flow to one place. Mitigation: Cloud Console quota alerts and a rotation runbook (both follow-ups — see ROADMAP).
+- **−** Two persistent GitHub Security alerts (Google OAuth Client ID + Client Secret), dismissed as "won't fix — intentional" but visible to every contributor onboarding to the repo. SECURITY.md is the explanation surface.
+- **Note:** if a fork rolls its own Cloud project and forgets to override the defaults via `--client-id` / `--client-secret`, they'll silently authenticate against Linways's project. Worth a follow-up callout in DEVELOPMENT.md for fork authors.
+
+---
+
 ## How to add a new ADR
 
 1. Bump the number (ADR-012, etc.).

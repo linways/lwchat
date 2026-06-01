@@ -1,0 +1,21 @@
+# GitGuardian configuration.
+#
+# The bundled Linways OAuth client (Cloud project lwchat-498010, Desktop
+# type) is committed to lib/auth.js by design. Per Google's OAuth policy
+# for Desktop apps, the client_secret is NOT confidential and must be
+# embedded in the binary for the flow to work. PKCE provides the security
+# boundary. See SECURITY.md ("Not in scope") and docs/DECISIONS.md ADR-015.
+#
+# Allowlist by VALUE, not by path — a broad ignored-paths entry for
+# lib/auth.js would hide a real future leak in the same file. Matching
+# only the two known intentional values keeps the scanner useful.
+
+version: 2
+
+secret:
+  ignored-matches:
+    - name: bundled-linways-oauth-client-id
+      match: 10594035390-2e5q6aqglhn6b3ju60927e05e8jg1224.apps.googleusercontent.com
+
+    - name: bundled-linways-oauth-client-secret
+      match: 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
