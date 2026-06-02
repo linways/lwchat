@@ -10,6 +10,11 @@ review** (per the "commit only when asked" rule).
 
 Run `git diff` to see everything; `lwchat doctor` → 8 ok / 0 fail throughout.
 
+> **Update (later in the session):** the fix/search work was committed (8 commits)
+> and a second branch `feat/agent-triage` was created off it with two new
+> read-only commands (`digest`, `inbox`) plus a third latent bug fix
+> (`peopleBatchGet`). See the "Agent-triage branch" section at the bottom.
+
 ---
 
 ## TL;DR
@@ -167,3 +172,52 @@ documented cron recommendation or a `lwchat index --all` convenience.
 - Everything is uncommitted on `fix/search`. Suggested commit grouping:
   (1) extractIssueId fix, (2) scoped+parallel scan + redmine_spaces,
   (3) api retry, (4) directory mentions.
+
+---
+
+## Agent-triage branch (`feat/agent-triage`)
+
+Branched off `fix/search`. Goal: take lwchat from reactive to **proactive/
+analytical** for the real exam-controller triage workload. All read-only; tested
+against live data; one commit per change.
+
+### Third latent bug found & fixed: `peopleBatchGet` (fix/people)
+`peopleBatchGet` passed `sources=READ_SOURCE_TYPE_DOMAIN_PROFILE` — that's the
+*searchDirectoryPeople* enum, **invalid** for `people.batchGet`, so every call
+returned HTTP 400. The caller treats names as best-effort (try/catch), so the
+400 was swallowed and member names silently fell back to raw `users/<id>`
+everywhere (`members`, `read`, and the new `digest`). Fixed to
+`READ_SOURCE_TYPE_PROFILE` (+`DOMAIN_CONTACT`). Verified ids now resolve
+(Lakshmi Nandakumar, Ranjith Balachandran, Alex Biju). **This belongs with the
+core fixes** — consider cherry-picking it onto `fix/search`.
+
+### `lwchat digest <issue> [--space <a>]`
+One-stop brief: Redmine record (via lwr) + chat participants + activity window +
+full timeline. Composes the warm-cache `find`/`read` path, so it's instant for
+indexed issues. Verified on #126124: status Closed, 5 participants, 20 messages,
+active 2026-05-21→06-02.
+
+### `lwchat inbox [--days N] [--space <a>]`
+Morning triage. Scans recent messages (default 14d) in `redmine_spaces` for
+`USER_MENTION` annotations of your id, groups by thread, flags `awaiting_reply`
+(no message by you after the latest mention), reverse-maps the issue id from the
+index, and enriches with Redmine status. Verified live: 53 mentions / 21
+awaiting over 14 days; 30 / 11 over 7 days — real, actionable, sorted
+awaiting-first.
+
+Suggested triage loop for an agent: `lwchat inbox --json` → for each awaiting
+item, `lwchat digest <issue> --json` → draft a reply (never auto-post).
+
+### Notes
+- `inbox` takes ~60s for a 14-day / 15-space sweep (phase-1 message scan
+  dominates). Tune with `--days 7` (~halves it) or scope with `--space`. A
+  future optimization could cap phase-1 pages or cache last-seen timestamps.
+- Both commands are read-only; no posting anywhere.
+- Commits on this branch: peopleBatchGet fix, digest, inbox, skill docs.
+
+## Suggested integration order
+1. Review `fix/search` (8 commits) — the critical `extractIssueId` fix is the
+   one that makes everything else matter.
+2. Cherry-pick `fix(people)` from `feat/agent-triage` onto `fix/search` (it's a
+   core fix, not a triage feature).
+3. Merge `fix/search`, then `feat/agent-triage`.
