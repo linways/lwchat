@@ -126,7 +126,7 @@ Returns messages chronologically, sender IDs resolved to names. If the issue is 
 lwchat reply <issue_id> "<message>" [--space <alias>] [--attach <local-file>] [--json]
 ```
 
-Posts a threaded reply. **@mentions are auto-resolved** — write `@Krishnakumar` or `@Ranjith Balachandran` and lwchat converts the name to the proper `<users/ID>` mention syntax (first name or full name; `@all` mentions everyone). The resolved text is shown before sending.
+Posts a threaded reply. **@mentions are auto-resolved** — write `@Krishnakumar` or `@Ranjith Balachandran` and lwchat converts the name to the proper `<users/ID>` mention syntax (first name or full name; `@all` mentions everyone). Names not in the space roster fall back to the org **directory**, so you can mention someone who isn't a member of the space yet. The resolved text is shown before sending; any name that still couldn't be resolved comes back in `unresolved_mentions` (and a stderr warning) — it posts as plain text and will **not** ping anyone, so check that field.
 
 `--attach` (optional): attach a local file (screenshot, repro, PDF, etc.). lwchat uploads the file to the same space as the thread and attaches it to the reply. Same constraints as `post --attach` — local paths only, not URLs. See the `post` section below for the why.
 
@@ -155,10 +155,11 @@ lwchat post <space> "<message>" --json                     # machine output
 ```json
 { "ok": true, "space": "spaces/...", "space_alias": "myspace",
   "thread": "spaces/.../threads/...", "message_name": "spaces/.../messages/...",
-  "resolved_text": "the posted text after @mention resolution" }
+  "resolved_text": "the posted text after @mention resolution",
+  "unresolved_mentions": ["names that didn't resolve — posted as plain text, no ping"] }
 ```
 
-@mentions are resolved across **all** cached spaces' member maps (since `post` isn't scoped to one space's roster).
+@mentions are resolved across **all** cached spaces' member maps (since `post` isn't scoped to one space's roster), then fall back to the org **directory** for any name still unresolved. `reply` and `dm` share the same resolution. Names that resolve nowhere are returned in `unresolved_mentions`.
 
 ### Direct message a person
 
@@ -233,7 +234,9 @@ lwchat cache show     # list cached issues, their spaces, and freshness
 lwchat cache clear    # drop the thread location cache
 ```
 
-The cache stores only **thread locations** (stable IDs), never messages. Within `cache_ttl_seconds` (default 300s) `find`/`read`/`reply` use it instantly; past the TTL they re-scan to catch a thread newly posted to another space, falling back to the cached location if the scan fails.
+The cache stores only **thread locations** (stable IDs), never messages. Within `cache_ttl_seconds` (default 7 days — locations are stable) `find`/`read`/`reply` use it instantly; past the TTL they re-scan to catch an issue newly posted to another space, falling back to the cached location if the scan fails.
+
+**Scoped, self-learning scan.** When a re-scan is needed, `find` doesn't blindly sweep all 31 spaces. It scans `config.redmine_spaces` first — the set of spaces it has *learned* host Redmine threads (only ~15 of 31 do; the top 5 hold ~95%). On a miss it falls back to a full `default_spaces` scan, and any space an issue is found in is merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space issues are still fully discovered (it collects every match, never stops at the first). Run `lwchat index` once to populate both the location cache and `redmine_spaces` for instant lookups.
 
 ### List recent threads
 
@@ -294,9 +297,10 @@ lwchat restore [name]       # latest if no name
 
 `config.json` keys:
 - **spaces**: alias → Google Chat space ID
-- **default_spaces**: spaces searched when no `--space` is given
-- **redmine_url_pattern**: change to match your Redmine instance
-- **cache_ttl_seconds**: thread-location cache freshness window (default 300; re-scans after this to catch new cross-posts)
+- **default_spaces**: spaces searched when no `--space` is given (full search scope)
+- **redmine_spaces**: learned subset of `default_spaces` that host Redmine threads; `find` scans these first, with a full fallback. Self-tuning — don't hand-trim it
+- **redmine_url_pattern**: regex to match your Redmine instance's issue URL (the trailing issue id is captured automatically)
+- **cache_ttl_seconds**: thread-location cache freshness window (default 604800 = 7 days; re-scans after this to catch new cross-posts)
 - **page_limit**: max pages scanned per space (100 messages/page)
 
 ---
