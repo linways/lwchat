@@ -15,6 +15,7 @@ import {
   cmdSpacesFetch,
   cmdFind,
   cmdRead,
+  cmdDigest,
   cmdReply,
   cmdPost,
   cmdDm,
@@ -52,6 +53,7 @@ COMMANDS:
 
     find    <issue_id>                  Find the issue's thread(s) — reports every space it's in
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
+    digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
     reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -211,6 +213,16 @@ async function main() {
           process.exit(1);
         }
         await cmdRead(issueId, spaceFlag, json);
+        break;
+      }
+
+      case "digest": {
+        const issueId = cleanArgs[1];
+        if (!issueId) {
+          console.error("Usage: lwchat digest <issue_id> [--space <alias>]");
+          process.exit(1);
+        }
+        await cmdDigest(issueId, spaceFlag, json);
         break;
       }
 
