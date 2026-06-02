@@ -120,6 +120,37 @@ Returns messages chronologically, sender IDs resolved to names. If the issue is 
 }
 ```
 
+### Digest an issue (merged Redmine + chat brief)
+
+```bash
+lwchat digest <issue_id> [--space <alias>] [--json]
+```
+
+One-stop context for picking up an issue: merges the **Redmine** record
+(subject, status, assignee, priority, tracker, project — via `lwr`, best-effort)
+with the **chat** thread(s): participants, activity window (`first_activity` /
+`last_activity`), and the full message timeline. Use this instead of `find` +
+`read` + a separate Redmine lookup. JSON shape: `{ ok, issue_id, redmine,
+space_count, total_messages, threads: [{ space_alias, thread, message_count,
+participants, first_activity, last_activity, messages }] }`. Read-only.
+
+### Inbox — mentions awaiting your reply
+
+```bash
+lwchat inbox [--days N] [--space <alias>] [--json]
+```
+
+Morning triage: messages that **@mention you** across the spaces that host
+Redmine threads (the learned `redmine_spaces`), within the last `--days` window
+(default 14). Mentions are detected from message annotations (robust — message
+text only shows `@DisplayName`). Grouped by thread, each flagged
+`awaiting_reply` (true when you haven't posted after the latest mention),
+enriched with the issue id (from the index) and Redmine status. Sorted
+awaiting-first. JSON shape: `{ ok, me, window_days, count, awaiting_count,
+items: [{ issue_id, space_alias, thread, mentioned_by, mention_time,
+awaiting_reply, last_activity, snippet, redmine_status }] }`. Read-only — great
+as the first call in a triage session, then `digest` the ones that need action.
+
 ### Reply to a thread
 
 ```bash
