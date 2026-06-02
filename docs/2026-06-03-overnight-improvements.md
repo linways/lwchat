@@ -105,7 +105,13 @@ was flagged unresolved.
 
 ---
 
-## Proposals for your review (NOT implemented — they change semantics or need your call)
+## Proposals for your review
+
+> **Status update:** since this section was first written, **P1 (raise TTL to
+> 7d), P2 (parallelize `index` → ~1m), and the People-API retry extension were
+> implemented and committed** on `fix/search`. P3–P6 below remain open
+> proposals. Frequency-ranking (P3) was deliberately skipped — the scoped+
+> parallel scan is already fast and ranking adds state for marginal gain.
 
 ### P1 — Raise the thread-location cache TTL (highest-value, one line)
 `cache_ttl_seconds` defaults to **300s (5 min)**. But a thread *location* is
