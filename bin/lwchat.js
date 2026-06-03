@@ -15,6 +15,8 @@ import {
   cmdSpacesFetch,
   cmdFind,
   cmdRead,
+  cmdDigest,
+  cmdInbox,
   cmdReply,
   cmdPost,
   cmdDm,
@@ -52,6 +54,8 @@ COMMANDS:
 
     find    <issue_id>                  Find the issue's thread(s) — reports every space it's in
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
+    digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
+    inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
     reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -132,6 +136,7 @@ async function main() {
   const threadFlag = popFlag("--thread");
   const spacesFlag = popFlag("--spaces"); // comma-separated list
   const limitFlag = popFlag("--limit");
+  const daysFlag = popFlag("--days"); // recency window — for `inbox`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
 
   // Dangling-flag detection: `lwchat post sp "msg" --attach` (no value
@@ -211,6 +216,22 @@ async function main() {
           process.exit(1);
         }
         await cmdRead(issueId, spaceFlag, json);
+        break;
+      }
+
+      case "digest": {
+        const issueId = cleanArgs[1];
+        if (!issueId) {
+          console.error("Usage: lwchat digest <issue_id> [--space <alias>]");
+          process.exit(1);
+        }
+        await cmdDigest(issueId, spaceFlag, json);
+        break;
+      }
+
+      case "inbox": {
+        const days = daysFlag ? parseInt(daysFlag, 10) : 14;
+        await cmdInbox({ days, spaceAlias: spaceFlag }, json);
         break;
       }
 
