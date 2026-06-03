@@ -99,7 +99,7 @@ Numbered by likelihood / value, **not** by promise.
 7. **CI / test harness** — currently the test surface is "run lwchat doctor + post to myspace + verify in Chat UI." A unit test scaffold (no network) for the pure-logic pieces (`extractIssueId`, `resolveMentions`, `normalizeLocations`, `freshestTs`) would catch regressions.
 8. **`spaces export` / `spaces import`** — let a fork ship a known-good `default_spaces` set as a file users can `lwchat spaces import linways.json`.
 9. **Reactions** — `lwchat react <message> :thumbsup:` for acknowledgement workflows. The Chat API supports `messages.reactions.create`.
-10. **Threading metadata** — `lwchat thread show <thread_name>` to dump everything about a thread including participants, age, last activity.
+10. ~~**Threading metadata** — `lwchat thread show <thread_name>` to dump everything about a thread including participants, age, last activity.~~ ✅ Done — reads any thread by name (messages + participants + activity window), the read-side mirror of `post --thread`.
 
 ### Speculative
 

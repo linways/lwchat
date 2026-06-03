@@ -16,6 +16,7 @@ import {
   cmdFind,
   cmdRead,
   cmdDigest,
+  cmdThreadShow,
   cmdInbox,
   cmdReply,
   cmdPost,
@@ -69,6 +70,7 @@ COMMANDS:
                                         Search messages across configured spaces (client-side scan)
 
     threads [--space <alias>]           List recent threads
+    thread show <thread_name>           Read any thread by name (spaces/<id>/threads/<id>) — works for non-Redmine threads
     index   [--space <alias>]           Build/refresh the thread-to-issue index
     cache   [show]                      Show cached threads + freshness (TTL)
     cache   clear                       Clear the thread location cache
@@ -232,6 +234,21 @@ async function main() {
       case "inbox": {
         const days = daysFlag ? parseInt(daysFlag, 10) : 14;
         await cmdInbox({ days, spaceAlias: spaceFlag }, json);
+        break;
+      }
+
+      case "thread": {
+        if (sub === "show") {
+          const name = cleanArgs[2];
+          if (!name) {
+            console.error("Usage: lwchat thread show <thread_name>");
+            process.exit(1);
+          }
+          await cmdThreadShow(name, json);
+        } else {
+          console.error("Usage: lwchat thread show <thread_name>");
+          process.exit(1);
+        }
         break;
       }
 

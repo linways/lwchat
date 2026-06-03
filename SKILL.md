@@ -277,6 +277,22 @@ lwchat threads [--space <alias>] [--json]
 
 Lists recent threads with first messages. With `--json`, enriches each thread with Redmine metadata (status, assignee, priority) via `lwr` if it's on PATH.
 
+### Read a thread by name (any thread, Redmine or not)
+
+```bash
+lwchat thread show <thread_name> [--json]
+```
+
+The read-side mirror of `post --thread`. `read`/`digest` need a Redmine
+`issue_id`; this reads **any** thread directly by its `spaces/<id>/threads/<id>`
+name — including announcements, tool launches, and other non-Redmine threads
+that have no issue. Get a thread name from `threads --json` or `search --json`.
+The space id is embedded in the thread name, so no `--space` is needed. Returns
+the same `messages[]` shape as `read`, plus `participants` / `first_activity` /
+`last_activity`, and `issue_id` if the starter happens to link one. Hand it a
+bare `spaces/<id>` (a space, not a thread) and it tells you so and how to list
+that space's threads.
+
 ### Members
 
 ```bash
