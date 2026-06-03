@@ -44,6 +44,7 @@ The **single source of truth** for runtime state. The cloned repo holds *code*; 
 │                              (Markdown — agents read this as session context)
 ├── cache/
 │   ├── thread-index.json    ─ issue_id → { space_alias → location }
+│   ├── thread-roots.json    ─ thread.name → { issue_id|null } (permanent; roots are immutable)
 │   └── members.json         ─ space → { user_id → display_name }
 ├── backups/                 ─ timestamped snapshots
 │   └── 2026-05-29T10-17-01_pre-project-switch/
@@ -126,6 +127,8 @@ cached entry exists?
 The TTL exists to **catch a thread newly posted to another space**, not to invalidate location data. Stale cache is always a safe fallback — Chat thread IDs do not change once created. (Default TTL is 7 days: locations are stable, so a short window only discards the instant cache hit.)
 
 **Scoped, self-learning live scan (`scanLocations`).** A live scan doesn't sweep all of `default_spaces` blindly. It scans `config.redmine_spaces` first — the learned subset of spaces that actually host Redmine threads (in practice ~15 of 31; the top 5 hold ~95%) — **concurrently** (bounded fan-out). On a scoped *miss* it falls back to a full `default_spaces` scan, so a brand-new issue is never lost; every space an issue is found in is then merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space discovery is preserved — the scan collects **every** match, never short-circuits across spaces.
+
+**Old-root resolution (`cache/thread-roots.json`).** The issue↔thread link lives only in a thread's *root* (the URL-bearing starter), but the scan window is recency-bounded — so a long-lived EPIC whose root predates the window was historically undiscoverable even while active today (`find` missed it; the "active thread, old root" blind spot). The scan now also collects every distinct `thread.name` in the window (replies included) and resolves each thread's root via `getThreadRoot`, decoupling *"thread is active"* (a reply in-window) from *"root is in-window."* Roots are immutable, so results — including `null` for non-issue threads — are cached **permanently** in `thread-roots.json`; a root is fetched at most once ever, so the cost amortizes to ~zero. `index --deep` reads far more pages per space for a one-time historical backfill. Residual gap: a *fully dormant* thread (no reply in the window) still needs `--deep`; `find` says so in its not-found `hint`.
 
 `lwchat cache show` / `lwchat cache clear` expose the cache to users.
 
