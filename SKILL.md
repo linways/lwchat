@@ -293,6 +293,27 @@ the same `messages[]` shape as `read`, plus `participants` / `first_activity` /
 bare `spaces/<id>` (a space, not a thread) and it tells you so and how to list
 that space's threads.
 
+### A person's recent posts
+
+```bash
+lwchat by <user> [--space <alias>] [--include-replies] [--limit N] [--json]
+```
+
+Lists a person's recent messages, newest first. `<user>` = full name, email, or
+`users/<id>` (resolved via the directory, same as `dm`). By default it scans the
+spaces that person is a member of; `--space` narrows to one.
+
+**Posts vs replies (important — this is a deliberate distinction):**
+- A **post** is a top-level message that *starts* a thread (`is_reply: false`,
+  shown as `● post`).
+- A **reply** is a message *inside* a thread (`is_reply: true`, shown as `↳ reply`).
+- `by` returns **posts only by default**; pass `--include-replies` to include
+  replies too. Every item is tagged in both pretty output and JSON (`is_reply`),
+  so "latest post" is never silently answered with a reply.
+
+> **Convention used everywhere:** "post" = top-level, "reply" = threaded reply,
+> "message" = either. When a request says "post", resolve to top-level.
+
 ### Members
 
 ```bash
