@@ -74,7 +74,7 @@ COMMANDS:
     thread show <thread_name>           Read any thread by name (spaces/<id>/threads/<id>) — works for non-Redmine threads
     by      <user> [--space <a>] [--include-replies] [--limit N]
                                         A person's recent posts (top-level by default; --include-replies widens)
-    index   [--space <alias>]           Build/refresh the thread-to-issue index
+    index   [--space <alias>] [--deep]   Build/refresh the thread-to-issue index (--deep = one-time historical backfill)
     cache   [show]                      Show cached threads + freshness (TTL)
     cache   clear                       Clear the thread location cache
 
@@ -122,10 +122,11 @@ async function main() {
   // (e.g. `reply <id> "msg" --json` must not append "--json" to the message).
   // Value-flags like --space / --client-id are NOT global; their command
   // handlers consume them positionally, so they stay in cleanArgs.
-  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies"]);
+  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep"]);
   const json = args.includes("--json");
   const caseSensitive = args.includes("--case-sensitive");
   const includeReplies = args.includes("--include-replies");
+  const deep = args.includes("--deep");
   let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a));
 
   // Pull a value-flag (e.g. --space exam-controller) out of the args and
@@ -334,7 +335,7 @@ async function main() {
       }
 
       case "index": {
-        await cmdIndex(spaceFlag, json);
+        await cmdIndex(spaceFlag, json, { deep });
         break;
       }
 

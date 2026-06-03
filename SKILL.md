@@ -269,6 +269,8 @@ The cache stores only **thread locations** (stable IDs), never messages. Within 
 
 **Scoped, self-learning scan.** When a re-scan is needed, `find` doesn't blindly sweep all 31 spaces. It scans `config.redmine_spaces` first — the set of spaces it has *learned* host Redmine threads (only ~15 of 31 do; the top 5 hold ~95%). On a miss it falls back to a full `default_spaces` scan, and any space an issue is found in is merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space issues are still fully discovered (it collects every match, never stops at the first). Run `lwchat index` once to populate both the location cache and `redmine_spaces` for instant lookups.
 
+**Old-root resolution (active thread, ancient root).** A thread's issue link lives only in its *root* (the URL-bearing starter), but a long-lived EPIC's root can be far older than the scan window while the thread is active today. So the scan also collects every thread that appears in the window (replies included) and resolves each thread's root via a **permanent root cache** (`cache/thread-roots.json` — roots are immutable, so each is fetched at most once ever). This means an active thread is found by its recent reply even when its root predates the window. First scan of a busy space pays the resolution cost once; after that it's cached. `lwchat index --deep` does a one-time historical backfill (reads far more pages per space). If `find` still returns nothing, the JSON carries a `hint` — a fully dormant thread whose root predates the window needs `index --deep`.
+
 ### List recent threads
 
 ```bash
