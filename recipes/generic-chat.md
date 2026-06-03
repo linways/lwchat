@@ -1,6 +1,6 @@
 ---
 name: generic-chat
-description: Patterns for using lwchat's generic Chat surface — posting to spaces (with or without a thread), DMing a person, and searching across spaces. These complement the Redmine-bridge commands (find/read/reply).
+description: Patterns for using lwchat's generic Chat surface — posting to spaces (with or without a thread), DMing a person, searching, reading any thread by name (thread show), and listing a person's posts (by). These complement the Redmine-bridge commands (find/read/digest/reply).
 ---
 
 # Generic Chat patterns (post / dm / search)
@@ -112,22 +112,37 @@ SPACE=$(echo "$SEARCH" | jq -r '.results[0].space_alias')
 lwchat post "$SPACE" "Quick question — does this affect new admissions too?" --thread "$THREAD"
 ```
 
-Or to `read`:
+Or read the whole thread `search` found — `thread show` takes the thread name
+directly (the space id is embedded in it, so no `--space` needed):
 
 ```bash
-# read the whole thread search found
 THREAD=$(lwchat search "..." --json | jq -r '.results[0].thread')
-SPACE=$(lwchat search "..." --json | jq -r '.results[0].space_alias')
-SPACE_ID=$(jq -r ".spaces[\"$SPACE\"]" ~/.lwchat/config.json)
-node -e "
-  import('/path/to/lwchat/lib/chat-api.js').then(async ({listThreadMessages}) => {
-    const r = await listThreadMessages('$SPACE_ID', '$THREAD');
-    console.log(JSON.stringify(r.messages, null, 2));
-  });
-"
+lwchat thread show "$THREAD" --json
 ```
 
-(That last pattern is a one-off — for routine use, prefer adding a `lwchat read-thread <thread_name>` command. See [DEVELOPMENT.md](../docs/DEVELOPMENT.md) for the walkthrough.)
+## Read any thread by name
+
+```bash
+lwchat thread show <spaces/<id>/threads/<id>> [--json]
+```
+
+The read-side mirror of `post --thread`. Unlike `read`/`digest` (which need a
+Redmine `issue_id`), this reads **any** thread — announcements, tool launches,
+generic discussion. Returns the same `messages[]` shape as `read`, plus
+participants and activity window. Hand it a bare `spaces/<id>` (a space, not a
+thread) and it tells you so and how to list that space's threads.
+
+## A person's recent posts
+
+```bash
+lwchat by <user> [--space <alias>] [--include-replies] [--limit N] [--json]
+```
+
+Lists someone's recent messages, newest first. **Posts vs replies matters:** a
+*post* is a top-level message that starts a thread; a *reply* is inside one. `by`
+returns **posts only by default** (`--include-replies` widens), and tags every
+item `● post` / `↳ reply` (and `is_reply` in JSON) — so "their latest post" is
+never answered with a reply. `<user>` = name, email, or `users/<id>`.
 
 ## Safety guidance
 

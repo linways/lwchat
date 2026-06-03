@@ -69,16 +69,21 @@ Every path is a constant in `lib/config.js`. New runtime files belong in this tr
     "exam-controller": "spaces/AAAAdOaHhRY",
     "myspace":          "spaces/AAAAI_WLIUo"
   },
-  "default_spaces": [                          // ordered scan list for find/index/search
+  "default_spaces": [                          // full scan scope for find/index/search
     "exam-controller", "academics", "dev-analysis"
   ],
-  "redmine_url_pattern": "redmine.linways.com/issues/",
-  "cache_ttl_seconds": 300,                    // thread-location cache freshness window
+  "redmine_spaces": [                          // learned subset that host issues (see §3)
+    "exam-controller", "dev-analysis"
+  ],
+  "redmine_url_pattern": "redmine\\.linways\\.com/issues/",  // a REGEX (escaped dots)
+  "cache_ttl_seconds": 604800,                 // thread-location cache freshness (7d)
   "page_limit": 20                             // max pages scanned per space (100 msgs/pg)
 }
 ```
 
 Default values live in `DEFAULT_CONFIG` (`lib/config.js`). Missing keys fall back to defaults at read time — adding a new config key is non-breaking for existing installs.
+
+`redmine_url_pattern` is used **as a regex** (`extractIssueId` appends `(\d+)` and runs it directly — it is not escaped, so escape literal dots yourself as in the default).
 
 ## 3. The thread-location cache (the most subtle piece)
 
@@ -118,7 +123,9 @@ cached entry exists?
                                         → return cached anyway (thread IDs are stable)
 ```
 
-The TTL exists to **catch a thread newly posted to another space**, not to invalidate location data. Stale cache is always a safe fallback — Chat thread IDs do not change once created.
+The TTL exists to **catch a thread newly posted to another space**, not to invalidate location data. Stale cache is always a safe fallback — Chat thread IDs do not change once created. (Default TTL is 7 days: locations are stable, so a short window only discards the instant cache hit.)
+
+**Scoped, self-learning live scan (`scanLocations`).** A live scan doesn't sweep all of `default_spaces` blindly. It scans `config.redmine_spaces` first — the learned subset of spaces that actually host Redmine threads (in practice ~15 of 31; the top 5 hold ~95%) — **concurrently** (bounded fan-out). On a scoped *miss* it falls back to a full `default_spaces` scan, so a brand-new issue is never lost; every space an issue is found in is then merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space discovery is preserved — the scan collects **every** match, never short-circuits across spaces.
 
 `lwchat cache show` / `lwchat cache clear` expose the cache to users.
 
