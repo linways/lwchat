@@ -23,13 +23,17 @@
 Each Redmine issue at your team gets a Google Chat thread where it's discussed (convention: the first message contains the issue URL). lwchat wires the two together, and adds a clean general-purpose Chat surface on top:
 
 ```bash
-lwchat find 126235                         # which thread(s) discuss this issue?
-lwchat read 126235                         # full thread, with sender names resolved
-lwchat reply 126235 "deployed @Ranjith"    # post back, @mention auto-resolved
+lwchat find 126235                          # which thread(s) discuss this issue?
+lwchat read 126235                          # full thread, with sender names resolved
+lwchat digest 126235                         # merged brief: Redmine status + chat timeline
+lwchat reply 126235 "deployed @Ranjith"     # post back, @mention auto-resolved
 
-lwchat post myspace "Hi team"              # top-level message to any space
-lwchat dm sibin@linways.com "ping"         # DM by email/name/id
-lwchat search "folio bug" --space cicd     # client-side search across spaces
+lwchat inbox                                # messages @mentioning you, awaiting your reply
+lwchat post myspace "Hi team"               # top-level message to any space
+lwchat dm sibin@linways.com "ping"          # DM by email/name/id
+lwchat search "folio bug" --space cicd      # client-side search across spaces
+lwchat thread show spaces/<id>/threads/<id> # read any thread by name (Redmine or not)
+lwchat by "Akshay Chandran" --space cicd    # a person's recent posts (top-level by default)
 
 lwchat me     # who am I, which spaces am I in
 lwchat doctor # one-shot runtime self-test

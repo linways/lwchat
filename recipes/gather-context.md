@@ -7,7 +7,20 @@ description: Gather full context for a Redmine issue by combining Redmine data w
 
 When asked to work on, analyse, or understand a Redmine issue, proactively fetch chat context alongside Redmine data.
 
-## Steps
+## Fastest path: `digest`
+
+`lwchat digest <id> --json` does the combine in one call — it merges the Redmine
+record (subject, status, assignee, priority, tracker, project — via `lwr`) with
+the chat thread(s): participants, activity window, and the full message timeline.
+
+```bash
+lwchat digest <id> --json
+```
+
+Reach for the manual steps below only when you need the raw Redmine
+description/attachments (`lwr issue view`) or the chat side alone (`lwchat read`).
+
+## Manual path (raw pieces)
 
 1. Get the issue details from Redmine:
    ```bash
