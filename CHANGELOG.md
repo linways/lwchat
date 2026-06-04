@@ -6,6 +6,14 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
+### Added
+- **Thread opt-out (`#stoplwchat`)** — `reply` and `post --thread` append an
+  auto-generated footer telling people they can mute lwchat by replying with
+  exactly `#stoplwchat`. lwchat then refuses to post in that thread
+  (`{ ok:false, opted_out:true }`). Read commands strip the footer so the
+  agent never sees stray hashtags. Governed by `config.thread_optout`
+  (`enabled` + `hashtag`); set `enabled:false` to disable entirely.
+
 ---
 
 ## [0.1.2] — 2026-05-31
