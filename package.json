@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node bin/lwchat.js",
-    "link": "npm link"
+    "link": "npm link",
+    "test": "node --test"
   },
   "keywords": ["google-chat", "redmine", "cli", "workspace"],
   "license": "MIT",

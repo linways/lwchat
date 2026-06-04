@@ -163,6 +163,16 @@ Posts a threaded reply. **@mentions are auto-resolved** — write `@Krishnakumar
 
 **Multi-space safety:** if the issue exists in more than one space, `reply` **refuses to post** without `--space <alias>` (so a message never lands in the wrong space). `find` first to see the options.
 
+**Thread opt-out (#stoplwchat):** Every threaded message lwchat sends carries
+an auto-generated footer telling people they can mute lwchat by replying with
+exactly `#stoplwchat`. Before posting, lwchat scans the thread; if anyone has
+replied with a message that is *exactly* the hashtag, `reply`/`post --thread`
+**refuse to post** and return `{ ok: false, opted_out: true }`. The footer
+hashtag (and the whole behavior) is governed by `config.thread_optout` and can
+be disabled. **Do not treat the hashtag as opt-out yourself** when reading —
+the CLI enforces it, and read output already has the footer stripped, so a
+`#stoplwchat` you see in a message is a real human opt-out, not boilerplate.
+
 **Use cases:**
 - Status update: `lwchat reply 126270 "#prod_release — deployed to production @Ranjith"`
 - Targeted: `lwchat reply 126270 "verified" --space exam-controller`
@@ -179,6 +189,10 @@ lwchat post <space> "<message>" --json                     # machine output
 ```
 
 `<space>` accepts a configured alias (`exam-controller`) or a raw `spaces/<id>`. With `--thread`, the message goes as a threaded reply to the named thread (use this when you have a thread name from `threads --json` or `search --json` and the thread isn't tied to a Redmine issue).
+
+> Threaded posts (`--thread`) carry the same opt-out footer and honor the same
+> `#stoplwchat` refusal as `reply` (see the reply section). Top-level posts
+> (no `--thread`) are unaffected.
 
 `--attach` takes a **local file path** (not a URL). lwchat uploads the file to the Chat space via the media-upload endpoint and attaches it to the message — Chat renders images inline. URLs are not supported: Google Chat blocks `cards`/`cardsV2` payloads for messages sent with human OAuth credentials, which is what lwchat uses. If you want to share a hosted image's URL, just include it in the text — Chat auto-link-previews most image URLs anyway.
 
