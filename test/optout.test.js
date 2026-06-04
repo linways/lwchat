@@ -17,6 +17,10 @@ test("buildFooter embeds the hashtag and the frozen prefix", () => {
   assert.ok(f.includes(HT), "footer must contain the hashtag");
 });
 
+test("buildFooter with a real hashtag never contains the literal 'undefined'", () => {
+  assert.ok(!buildFooter("#stoplwchat").includes("undefined"));
+});
+
 test("appendFooter joins body and footer with a blank line", () => {
   assert.equal(appendFooter("hello", HT), `hello\n\n${buildFooter(HT)}`);
 });
