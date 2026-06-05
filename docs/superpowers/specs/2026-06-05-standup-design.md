@@ -27,8 +27,9 @@ issue from the developer's seat, with the chat signal that marks each step:
 | `please deploy` / `please do the needful` (lead) | nudge (not a state change) |
 
 Notes that shape detection:
-- Hashtags vary in case (`#reopened`/`#Reopened`, `#Tested`/`#tested`) → matching
-  is **case-insensitive substring**.
+- Hashtags vary in **case, separator, and spelling**: `#reopened`/`#Reopened`,
+  `#qa_release`/`#QA-Release`/`#prod-release`, and typos like `#prod_Releasse`.
+  Matching must be **fuzzy** (see "Signal matching" below), not plain substring.
 - `#qa_release` and `#prod_release` are *my* actions → counted only when **I**
   authored the message.
 - `#tested` / `#reopened` are state changes from others → counted from **any**
@@ -90,16 +91,40 @@ classifyThread(messages, myId, cutoffIso) → {
 }
 ```
 
-Signal detection (only messages with `createTime > cutoffIso` count):
-- `prod_release` — a message **I** authored whose text contains `#prod_release`
-  (case-insensitive).
-- `qa_release` — a message **I** authored containing `#qa_release`.
-- `tested` — **any** message containing `#tested`.
-- `reopened` — **any** message containing `#reopened`.
+Signal detection (only messages with `createTime > cutoffIso` count). Each
+hashtag signal uses the fuzzy matcher described in "Signal matching":
+- `prod_release` — a message **I** authored with a hashtag matching `prod_release`.
+- `qa_release` — a message **I** authored with a hashtag matching `qa_release`.
+- `tested` — **any** message with a hashtag matching `tested`.
+- `reopened` — **any** message with a hashtag matching `reopened`.
 - `assigned_to_me` — a message whose text contains `assigned to` (case-insensitive)
   AND has a `USER_MENTION` annotation whose user id == my id.
 - `reassigned_away` — `assigned to` + a `USER_MENTION` of a **different** user id,
   with no `assigned_to_me` in the window.
+
+### Signal matching (fuzzy, hashtag-anchored)
+
+Real messages spell the tags inconsistently — different case (`#Reopened`),
+different separators (`#QA-Release`, `#prod-release`), and outright typos
+(`#prod_Releasse`). To absorb that without matching arbitrary prose:
+
+1. **Extract hashtag tokens only.** Pull substrings shaped like `#<word>` from the
+   message (`/#[\p{L}0-9_-]+/u`). Matching is anchored to these tokens, so a normal
+   word in a sentence can't trigger a signal — only an actual `#tag` can.
+2. **Normalize** each token and the canonical target: lowercase, drop the `#` and
+   every non-alphanumeric character. So `#QA-Release`, `#qa_release`, and
+   `#Qa Release`(as one token) all normalize to `qarelease`; the target
+   `qa_release` normalizes to `qarelease`.
+3. **Compare with a small edit-distance tolerance** (Levenshtein) to absorb typos:
+   a token matches a target if the normalized forms are equal **or** within
+   `tol` edits, where `tol = 2` for targets of length ≥ 7 (`prodrelease`,
+   `qarelease`, `reopened`) and `tol = 1` for shorter ones (`tested`). This catches
+   `prodreleasse`→`prodrelease` (1 edit) and `reopens`→`reopened` (2 edits) while
+   staying tight enough to avoid cross-matching the four distinct tags.
+
+The canonical targets (`prod_release`, `qa_release`, `tested`, `reopened`) and the
+matcher live as constants/functions in `lib/standup.js`, so the vocabulary is one
+place to change.
 
 Bucket = furthest stage reached, by this precedence (highest first):
 
@@ -183,7 +208,10 @@ Within a bucket, items sort by `signal_time` descending (most recent first).
 - authorship guard: a `#qa_release` posted by **someone else** does NOT set
   `qa_release`; a `#tested` posted by anyone DOES set `tested`.
 - window guard: a `#prod_release` older than the cutoff is ignored.
-- case-insensitivity for every hashtag.
+- fuzzy matching: case variants (`#Reopened`), separator variants
+  (`#QA-Release`, `#prod-release`), and typos (`#prod_Releasse`) all classify
+  correctly; a non-hashtag word ("released to prod" in prose) does NOT trigger a
+  signal; a clearly different hashtag (`#deployed`) does not cross-match.
 
 **Manual (live, read-only against real spaces):**
 - `lwchat standup --json` returns buckets consistent with the last week's
