@@ -189,6 +189,17 @@ qa_release, reopened, assigned, working }, reassigned_away }` where each item is
 `{ bucket, issue_id, issue_url, college, subject, space_alias, thread,
 thread_url, redmine_status, snippet, signal_time, signal_by }`.
 
+**Rich card (`--card`):** `lwchat standup --card [--webhook <alias|url>]` builds a
+clickable Google Chat **card** (cardsV2) and POSTs it to a Chat **incoming
+webhook** (no server needed — cardsV2 is rejected for human-OAuth, so a webhook
+is the way to render a clickable card). Each row: **college** · `#id`→Redmine ·
+*time* (when the signal was posted, e.g. `#prod_release`), the subject→thread,
+and a colored status chip; with per-bucket counts and a summary. Webhook URLs are
+secrets stored in `~/.lwchat/config.json` under `standup_webhooks` (alias → url),
+never in the repo; resolve with `--webhook <alias>`, or omit when only one is
+configured. The default window is **24h** (`--hours N` to widen, e.g. 72 on
+Mondays).
+
 ### Reply to a thread
 
 ```bash
