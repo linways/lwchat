@@ -7,6 +7,11 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ### Added
+- **`standup --card`** — posts the standup as a clickable Google Chat card
+  (cardsV2) to a configured incoming webhook (`standup_webhooks` in
+  `~/.lwchat/config.json`, resolved by `--webhook <alias|url>`). Rich rows
+  (college · issue→Redmine · time, subject→thread, colored status chip), per-bucket
+  counts, and a summary. Also: the `standup` default window is now **24h** (was 30h).
 - **`standup` command** — read-only daily standup report. Buckets your recent
   threads (default last 30h, `--hours N`) into prod_release / qa_passed /
   qa_release / reopened / assigned / working by reading the team's chat
