@@ -173,9 +173,17 @@ Buckets (a thread appears once, in its furthest stage):
 `#qa_release` / `#prod_release` only count when **you** authored them;
 `#tested` / `#reopened` count from anyone. Threads reassigned *away* from you are
 excluded from the buckets and listed under `reassigned_away`. Chat signals decide
-the bucket; Redmine `status` is shown as enrichment. JSON shape: `{ ok, me,
-window_hours, count, buckets: { prod_release, qa_passed, qa_release, reopened,
-assigned, working }, reassigned_away }`.
+the bucket; Redmine `status` is shown as enrichment.
+
+Each item carries `subject` (the Redmine subject — recovered from the thread
+root's issue URL even when the thread isn't indexed yet; falls back to the root
+message text) and `thread_url` (a `https://chat.google.com/room/<space>/<thread>`
+deep link), so the report is readable without memorizing issue ids and each line
+links to its thread. When composing a Chat post from this, hyperlink with the
+`<thread_url|#id — subject>` markup. JSON shape: `{ ok, me, window_hours, count,
+buckets: { prod_release, qa_passed, qa_release, reopened, assigned, working },
+reassigned_away }` where each item is `{ bucket, issue_id, subject, space_alias,
+thread, thread_url, redmine_status, snippet, signal_time, signal_by }`.
 
 ### Reply to a thread
 
