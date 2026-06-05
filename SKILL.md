@@ -154,13 +154,21 @@ as the first call in a triage session, then `digest` the ones that need action.
 ### Standup — your daily report
 
 ```bash
-lwchat standup [--hours N] [--space <alias>] [--json]
+lwchat standup [--hours N] [--space <alias>] [--json]                          # read-only report
+lwchat standup --card [--webhook <alias|url>] [--hours N] [--space <alias>]     # POST a clickable card to a space
 ```
 
 Read-only morning report for the daily standup. Like `inbox`, but instead of
 awaiting/replied it **buckets** your recent threads by the team's chat
 conventions. A thread is included if, within the window (default **24h**), it
 @mentions you **or** you posted in it.
+
+> **To post a standup/daily summary to a Chat space, ALWAYS use `lwchat standup
+> --card`** (see "Rich card" below) — it renders the clickable card via the
+> configured webhook and auto-picks the webhook when only one is set. Do **NOT**
+> hand-assemble a summary from `read`/`inbox`/`search` and `post` it as plain
+> text; `--card` is the canonical path and looks far better. Use `--space
+> v4-exam-controller` to scope it to V4.
 
 Buckets (a thread appears once, in its furthest stage):
 - 🚀 **prod_release** — you posted `#prod_release`
@@ -181,9 +189,10 @@ message text), `college` (the issue's `College` Redmine custom field, e.g.
 `SCCZ`), and `thread_url` (a `https://chat.google.com/room/<space>/<thread>`
 deep link), so the report is readable without memorizing issue ids and each line
 links to its thread. It also carries `issue_url` (the Redmine issue link). A line
-reads `#id · college · subject (status)`. When composing a Chat post from this,
-number the items and use **two** links per line — the issue id → Redmine, the
-rest → the thread: `<issue_url|#id> · <thread_url|college · subject> (status)`.
+reads `#id · college · subject (status)`. **To post it, use `--card`** (below) —
+that's the intended path. Only if a target space has no webhook, fall back to a
+plain `post` with numbered two-link rows — issue id → Redmine, the rest → the
+thread: `<issue_url|#id> · <thread_url|college · subject> (status)`.
 JSON shape: `{ ok, me, window_hours, count, buckets: { prod_release, qa_passed,
 qa_release, reopened, assigned, working }, reassigned_away }` where each item is
 `{ bucket, issue_id, issue_url, college, subject, space_alias, thread,
