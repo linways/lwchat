@@ -159,7 +159,7 @@ lwchat standup [--hours N] [--space <alias>] [--json]
 
 Read-only morning report for the daily standup. Like `inbox`, but instead of
 awaiting/replied it **buckets** your recent threads by the team's chat
-conventions. A thread is included if, within the window (default **30h**), it
+conventions. A thread is included if, within the window (default **24h**), it
 @mentions you **or** you posted in it.
 
 Buckets (a thread appears once, in its furthest stage):
