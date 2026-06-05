@@ -20,6 +20,7 @@ import {
   cmdInbox,
   cmdStandup,
   cmdStandupTeam,
+  cmdStandupCron,
   cmdBy,
   cmdReply,
   cmdPost,
@@ -64,6 +65,8 @@ COMMANDS:
                                         Standup buckets (last 24h, default = you; --user targets a teammate; --team runs every standup_team member); --card posts a clickable card to a Chat webhook
     standup team list|add <who>|remove <who>
                                         Manage standup_team (the members --team / the scheduled run cover)
+    standup cron install [--at HH:MM] [--days mon-sat] | status | remove
+                                        Schedule the Mon–Sat 10:00 auto-post (standup --team --card); logs to ~/.lwchat/cron/standup.log
     reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -154,6 +157,7 @@ async function main() {
   const daysFlag = popFlag("--days"); // recency window — for `inbox`
   const hoursFlag = popFlag("--hours"); // recency window in hours — for `standup`
   const userFlag = popFlag("--user");   // standup: target user (name/email/id)
+  const atFlag = popFlag("--at");        // standup cron: time HH:MM
   const webhookFlag = popFlag("--webhook"); // alias or url — for `standup --card`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
 
@@ -256,6 +260,7 @@ async function main() {
       case "standup": {
         const subc = cleanArgs[1];
         if (subc === "team") { await cmdStandupTeam(cleanArgs[2], cleanArgs[3], json); break; }
+        if (subc === "cron") { await cmdStandupCron(cleanArgs[2], { at: atFlag, days: daysFlag }, json); break; }
         const hours = hoursFlag ? parseInt(hoursFlag, 10) : 24;
         await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag, user: userFlag, team }, json);
         break;
