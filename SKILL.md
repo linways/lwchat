@@ -163,12 +163,18 @@ awaiting/replied it **buckets** your recent threads by the team's chat
 conventions. A thread is included if, within the window (default **24h**), it
 @mentions you **or** you posted in it.
 
-> **To post a standup/daily summary to a Chat space, ALWAYS use `lwchat standup
-> --card`** (see "Rich card" below) — it renders the clickable card via the
-> configured webhook and auto-picks the webhook when only one is set. Do **NOT**
-> hand-assemble a summary from `read`/`inbox`/`search` and `post` it as plain
-> text; `--card` is the canonical path and looks far better. Use `--space
-> v4-exam-controller` to scope it to V4.
+> **DEFAULT ACTION — when the user asks for "my standup", "daily standup",
+> "daily summary", or similar, just run:**
+> ```bash
+> lwchat standup --card --space v4-exam-controller
+> ```
+> This posts the clickable card to the user's summary space (auto-picks the lone
+> configured webhook). The card is the ONLY desired output — you do **not** need
+> the user to say "card" or "post", and you do **not** need to confirm before
+> posting (this is their own summary space, standing pre-approved). Do **NOT**
+> hand-assemble a summary from `read`/`inbox`/`search` + `post` plain text.
+> Only use bare `standup` (no `--card`) when the user explicitly says they just
+> want to *see/read* it (no posting), or asks for `--json`.
 
 Buckets (a thread appears once, in its furthest stage):
 - 🚀 **prod_release** — you posted `#prod_release`
