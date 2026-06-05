@@ -165,6 +165,10 @@ id by heart:
 - `college` — the issue's `College` Redmine custom field (e.g. `SCCZ`), via
   `getIssue`. `null` when unavailable. A standup line reads
   `#id · college · subject (status)`.
+- `issue_url` — the Redmine issue URL, built from the id + `redmine_url_pattern`
+  (`redmineIssueUrl` in `lib/util.js`). `null` when there's no issue id. Lets a
+  posted line carry **two** links: the issue id → Redmine, the rest → the thread,
+  e.g. `<issue_url|#126702> · <thread_url|college · subject> (status)`.
 - `thread_url` — a Google Chat deep link to the thread,
   `https://chat.google.com/room/<space>/<thread>` (the `spaces/`/`threads/`
   prefixes stripped). Built by a small pure helper `chatThreadUrl(threadName)`
