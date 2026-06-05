@@ -162,6 +162,9 @@ id by heart:
   available; otherwise a fallback drawn from the thread's **root** (earliest)
   message text (the thread-starter, which carries the issue URL + description),
   trimmed/normalized and truncated. `null` only if neither is available.
+- `college` — the issue's `College` Redmine custom field (e.g. `SCCZ`), via
+  `getIssue`. `null` when unavailable. A standup line reads
+  `#id · college · subject (status)`.
 - `thread_url` — a Google Chat deep link to the thread,
   `https://chat.google.com/room/<space>/<thread>` (the `spaces/`/`threads/`
   prefixes stripped). Built by a small pure helper `chatThreadUrl(threadName)`
