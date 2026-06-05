@@ -151,6 +151,32 @@ items: [{ issue_id, space_alias, thread, mentioned_by, mention_time,
 awaiting_reply, last_activity, snippet, redmine_status }] }`. Read-only — great
 as the first call in a triage session, then `digest` the ones that need action.
 
+### Standup — your daily report
+
+```bash
+lwchat standup [--hours N] [--space <alias>] [--json]
+```
+
+Read-only morning report for the daily standup. Like `inbox`, but instead of
+awaiting/replied it **buckets** your recent threads by the team's chat
+conventions. A thread is included if, within the window (default **30h**), it
+@mentions you **or** you posted in it.
+
+Buckets (a thread appears once, in its furthest stage):
+- 🚀 **prod_release** — you posted `#prod_release`
+- ✅ **qa_passed** — a tester posted `#tested` and you haven't prod-released yet
+- 🧪 **qa_release** — you posted `#qa_release`
+- 🔴 **reopened** — someone posted `#reopened`
+- 🆕 **assigned** — `Assigned to @you`
+- 🚧 **working** — mentioned/assigned, no terminal signal yet
+
+`#qa_release` / `#prod_release` only count when **you** authored them;
+`#tested` / `#reopened` count from anyone. Threads reassigned *away* from you are
+excluded from the buckets and listed under `reassigned_away`. Chat signals decide
+the bucket; Redmine `status` is shown as enrichment. JSON shape: `{ ok, me,
+window_hours, count, buckets: { prod_release, qa_passed, qa_release, reopened,
+assigned, working }, reassigned_away }`.
+
 ### Reply to a thread
 
 ```bash
