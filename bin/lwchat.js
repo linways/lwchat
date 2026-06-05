@@ -18,6 +18,7 @@ import {
   cmdDigest,
   cmdThreadShow,
   cmdInbox,
+  cmdStandup,
   cmdBy,
   cmdReply,
   cmdPost,
@@ -58,6 +59,7 @@ COMMANDS:
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
     digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
+    standup [--hours N] [--space <a>]   Your standup buckets: prod/qa/reopened/assigned/working (last 30h)
     reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -144,6 +146,7 @@ async function main() {
   const spacesFlag = popFlag("--spaces"); // comma-separated list
   const limitFlag = popFlag("--limit");
   const daysFlag = popFlag("--days"); // recency window — for `inbox`
+  const hoursFlag = popFlag("--hours"); // recency window in hours — for `standup`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
 
   // Dangling-flag detection: `lwchat post sp "msg" --attach` (no value
@@ -239,6 +242,12 @@ async function main() {
       case "inbox": {
         const days = daysFlag ? parseInt(daysFlag, 10) : 14;
         await cmdInbox({ days, spaceAlias: spaceFlag }, json);
+        break;
+      }
+
+      case "standup": {
+        const hours = hoursFlag ? parseInt(hoursFlag, 10) : 30;
+        await cmdStandup({ hours, spaceAlias: spaceFlag }, json);
         break;
       }
 
