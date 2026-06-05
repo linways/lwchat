@@ -112,3 +112,21 @@ test("empty thread → working with no signal", () => {
   assert.equal(c.bucket, "working");
   assert.equal(c.signalBy, null);
 });
+
+test("alias vocab: #movedToProduction / #movedToProd → prod_release", () => {
+  assert.equal(classifyThread([msg({ text: "#movedToProduction @x" })], ME, CUTOFF).bucket, "prod_release");
+  assert.equal(classifyThread([msg({ text: "#movedToProd" })], ME, CUTOFF).bucket, "prod_release");
+  assert.equal(classifyThread([msg({ text: "#Moved-To-Production" })], ME, CUTOFF).bucket, "prod_release");
+});
+
+test("alias vocab: #movedToQa → qa_release", () => {
+  assert.equal(classifyThread([msg({ text: "#movedToQa @x" })], ME, CUTOFF).bucket, "qa_release");
+  assert.equal(classifyThread([msg({ text: "#moved_to_qa" })], ME, CUTOFF).bucket, "qa_release");
+});
+
+test("alias vocab: standard tags + precision still hold", () => {
+  assert.equal(classifyThread([msg({ text: "#prod_release" })], ME, CUTOFF).bucket, "prod_release");
+  assert.equal(classifyThread([msg({ text: "#qa_release" })], ME, CUTOFF).bucket, "qa_release");
+  // movedToQa must NOT be read as prod, and a near-miss word must not match
+  assert.equal(classifyThread([msg({ by: OTHER, text: "#movedhouse" })], ME, CUTOFF).bucket, "working");
+});
