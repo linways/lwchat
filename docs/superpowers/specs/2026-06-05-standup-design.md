@@ -156,6 +156,23 @@ only if `lwr` is on PATH) attach the Redmine `status`. Resolve author display
 names via the aggregated member map. Chat signals — not Redmine status — decide
 the bucket; status is shown alongside for context.
 
+Each item also carries enough context to be readable without knowing the issue
+id by heart:
+- `subject` — the issue's Redmine subject when `issue_id` is known and `lwr` is
+  available; otherwise a fallback drawn from the thread's **root** (earliest)
+  message text (the thread-starter, which carries the issue URL + description),
+  trimmed/normalized and truncated. `null` only if neither is available.
+- `thread_url` — a Google Chat deep link to the thread,
+  `https://chat.google.com/room/<space>/<thread>` (the `spaces/`/`threads/`
+  prefixes stripped). Built by a small pure helper `chatThreadUrl(threadName)`
+  in `lib/util.js`.
+
+Human output shows the subject next to the id. JSON exposes `subject` and
+`thread_url` so a caller (e.g. composing a Daily-Summary post) can render a
+hyperlink. In Google Chat message text, a hyperlink with custom label uses the
+`<url|label>` markup — so a posted standup line can read
+`🚀 <thread_url|#125789 — subject> (Resolved)`.
+
 ## Output
 
 **Human:** a header line (`🗓 Standup — last 30h · N thread(s)`), then each
