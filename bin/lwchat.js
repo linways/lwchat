@@ -59,8 +59,8 @@ COMMANDS:
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
     digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
-    standup [--hours N] [--space <a>] [--card [--webhook <alias|url>]]
-                                        Your standup buckets (last 24h); --card posts a clickable card to a Chat webhook
+    standup [--user <name|email|id>] [--hours N] [--space <a>] [--card [--webhook <alias|url>]]
+                                        Standup buckets (last 24h, default = you; --user targets a teammate); --card posts a clickable card to a Chat webhook
     reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -149,6 +149,7 @@ async function main() {
   const limitFlag = popFlag("--limit");
   const daysFlag = popFlag("--days"); // recency window — for `inbox`
   const hoursFlag = popFlag("--hours"); // recency window in hours — for `standup`
+  const userFlag = popFlag("--user");   // standup: target user (name/email/id)
   const webhookFlag = popFlag("--webhook"); // alias or url — for `standup --card`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
 
@@ -250,7 +251,7 @@ async function main() {
 
       case "standup": {
         const hours = hoursFlag ? parseInt(hoursFlag, 10) : 24;
-        await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag }, json);
+        await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag, user: userFlag }, json);
         break;
       }
 
