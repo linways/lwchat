@@ -7,6 +7,13 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ### Added
+- **standup: any user, team & schedule** — `standup --user <name|email|id>` runs
+  any teammate's standup; vocabulary now covers variants (`#movedToProduction` /
+  `#movedToQa` alongside `#prod_release`/`#qa_release`). `standup --team` posts a
+  card per `standup_team` member (managed via `standup team list|add|remove`).
+  `standup cron install [--at] [--days]` / `status` / `remove` schedules the
+  Mon–Sat 10:00 auto-post via a generic `lib/cron.js`; logs in `~/.lwchat/cron/`.
+  SKILL.md trimmed — full reference moved to `recipes/standup.md`.
 - **`standup --card`** — posts the standup as a clickable Google Chat card
   (cardsV2) to a configured incoming webhook (`standup_webhooks` in
   `~/.lwchat/config.json`, resolved by `--webhook <alias|url>`). Rich rows
