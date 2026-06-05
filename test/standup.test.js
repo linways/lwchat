@@ -83,9 +83,9 @@ test("fuzzy: case + separator variants classify correctly", () => {
   assert.equal(classifyThread([msg({ by: OTHER, text: "#Reopened" })], ME, CUTOFF).bucket, "reopened");
 });
 
-test("fuzzy: typos within edit tolerance classify correctly", () => {
+test("fuzzy: 1-edit typos classify correctly", () => {
   assert.equal(classifyThread([msg({ text: "#prod_Releasse" })], ME, CUTOFF).bucket, "prod_release");
-  assert.equal(classifyThread([msg({ by: OTHER, text: "#reopens still broken" })], ME, CUTOFF).bucket, "reopened");
+  assert.equal(classifyThread([msg({ by: OTHER, text: "#reopend still broken" })], ME, CUTOFF).bucket, "reopened");
 });
 
 test("fuzzy: only hashtag tokens trigger; prose does not", () => {
@@ -97,6 +97,14 @@ test("fuzzy: only hashtag tokens trigger; prose does not", () => {
 test("fuzzy: a clearly different hashtag does not cross-match", () => {
   const c = classifyThread([msg({ text: "#deployed to staging" })], ME, CUTOFF);
   assert.equal(c.bucket, "working");
+});
+
+test("fuzzy: common adjacent words do NOT false-match (precision)", () => {
+  // #tester is one edit from "tested" but is a real common word → must NOT match.
+  assert.equal(classifyThread([msg({ by: OTHER, text: "#tester assigned" })], ME, CUTOFF).bucket, "working");
+  // #release (2 edits from qarelease) and #reopen (2 from reopened) must NOT match.
+  assert.equal(classifyThread([msg({ text: "#release notes" })], ME, CUTOFF).bucket, "working");
+  assert.equal(classifyThread([msg({ by: OTHER, text: "#reopen later" })], ME, CUTOFF).bucket, "working");
 });
 
 test("empty thread → working with no signal", () => {

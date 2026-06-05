@@ -115,12 +115,18 @@ different separators (`#QA-Release`, `#prod-release`), and outright typos
    every non-alphanumeric character. So `#QA-Release`, `#qa_release`, and
    `#Qa Release`(as one token) all normalize to `qarelease`; the target
    `qa_release` normalizes to `qarelease`.
-3. **Compare with a small edit-distance tolerance** (Levenshtein) to absorb typos:
-   a token matches a target if the normalized forms are equal **or** within
-   `tol` edits, where `tol = 2` for targets of length ≥ 7 (`prodrelease`,
-   `qarelease`, `reopened`) and `tol = 1` for shorter ones (`tested`). This catches
-   `prodreleasse`→`prodrelease` (1 edit) and `reopens`→`reopened` (2 edits) while
-   staying tight enough to avoid cross-matching the four distinct tags.
+3. **Compare with a small per-tag edit-distance tolerance** (Levenshtein) to
+   absorb typos: a token matches a target if the normalized forms are equal
+   **or** within `tol` edits. Case/separator variants already normalize to the
+   canonical form (distance 0), so the tolerance only needs to cover genuine
+   misspellings. Tolerance is **1** for `prodrelease`, `qarelease`, `reopened`
+   (no common English word sits within 1 edit of them) and **0** for `tested`
+   (it is short and common words are one edit away — `tester`, `test` — so any
+   tolerance would mis-bucket them). This catches `prodreleasse`→`prodrelease`
+   while rejecting `#tester`, `#release`, and `#reopen`, which are *not* part of
+   the vocabulary. (2-edit typos like `reopens` are intentionally not matched —
+   precision over recall, since a wrong bucket is worse than a missed fuzzy hit
+   the dev can eyeball.)
 
 The canonical targets (`prod_release`, `qa_release`, `tested`, `reopened`) and the
 matcher live as constants/functions in `lib/standup.js`, so the vocabulary is one
