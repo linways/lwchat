@@ -154,66 +154,25 @@ as the first call in a triage session, then `digest` the ones that need action.
 ### Standup — your daily report
 
 ```bash
-lwchat standup [--hours N] [--space <alias>] [--json]                          # read-only report
-lwchat standup --card [--webhook <alias|url>] [--hours N] [--space <alias>]     # POST a clickable card to a space
+lwchat standup [--user <who>] [--card] [--hours N] [--space <a>] [--json]
+lwchat standup team list|add <who>|remove <who>     # who's in the scheduled run
+lwchat standup cron install|status|remove           # Mon–Sat 10:00 auto-post
 ```
 
-Read-only morning report for the daily standup. Like `inbox`, but instead of
-awaiting/replied it **buckets** your recent threads by the team's chat
-conventions. A thread is included if, within the window (default **24h**), it
-@mentions you **or** you posted in it.
+Buckets a user's recent threads (default **24h**) — prod/qa/reopened/assigned/
+working — by the team's chat conventions, and can post a clickable Chat card.
 
-> **DEFAULT ACTION — when the user asks for "my standup", "daily standup",
-> "daily summary", or similar, just run:**
-> ```bash
-> lwchat standup --card --space v4-exam-controller
-> ```
-> This posts the clickable card to the user's summary space (auto-picks the lone
-> configured webhook). The card is the ONLY desired output — you do **not** need
-> the user to say "card" or "post", and you do **not** need to confirm before
-> posting (this is their own summary space, standing pre-approved). Do **NOT**
-> hand-assemble a summary from `read`/`inbox`/`search` + `post` plain text.
-> Only use bare `standup` (no `--card`) when the user explicitly says they just
-> want to *see/read* it (no posting), or asks for `--json`.
+> **DEFAULT ACTION:** when the user asks for "my standup" / "daily summary" / "post
+> standups for X, Y, Z", **post the card** — do not hand-assemble plain text.
+> - one person → `lwchat standup --card --space v4-exam-controller` (default = you;
+>   another person → add `--user "<name>"`).
+> - several people → run it once **per name** (`--user`), one card each.
+> - no confirm needed (own summary space, pre-approved). Bare `standup` (no
+>   `--card`) only when they just want to read it.
 
-Buckets (a thread appears once, in its furthest stage):
-- 🚀 **prod_release** — you posted `#prod_release`
-- ✅ **qa_passed** — a tester posted `#tested` and you haven't prod-released yet
-- 🧪 **qa_release** — you posted `#qa_release`
-- 🔴 **reopened** — someone posted `#reopened`
-- 🆕 **assigned** — `Assigned to @you`
-- 🚧 **working** — mentioned/assigned, no terminal signal yet
-
-`#qa_release` / `#prod_release` only count when **you** authored them;
-`#tested` / `#reopened` count from anyone. Threads reassigned *away* from you are
-excluded from the buckets and listed under `reassigned_away`. Chat signals decide
-the bucket; Redmine `status` is shown as enrichment.
-
-Each item carries `subject` (the Redmine subject — recovered from the thread
-root's issue URL even when the thread isn't indexed yet; falls back to the root
-message text), `college` (the issue's `College` Redmine custom field, e.g.
-`SCCZ`), and `thread_url` (a `https://chat.google.com/room/<space>/<thread>`
-deep link), so the report is readable without memorizing issue ids and each line
-links to its thread. It also carries `issue_url` (the Redmine issue link). A line
-reads `#id · college · subject (status)`. **To post it, use `--card`** (below) —
-that's the intended path. Only if a target space has no webhook, fall back to a
-plain `post` with numbered two-link rows — issue id → Redmine, the rest → the
-thread: `<issue_url|#id> · <thread_url|college · subject> (status)`.
-JSON shape: `{ ok, me, window_hours, count, buckets: { prod_release, qa_passed,
-qa_release, reopened, assigned, working }, reassigned_away }` where each item is
-`{ bucket, issue_id, issue_url, college, subject, space_alias, thread,
-thread_url, redmine_status, snippet, signal_time, signal_by }`.
-
-**Rich card (`--card`):** `lwchat standup --card [--webhook <alias|url>]` builds a
-clickable Google Chat **card** (cardsV2) and POSTs it to a Chat **incoming
-webhook** (no server needed — cardsV2 is rejected for human-OAuth, so a webhook
-is the way to render a clickable card). Each row: **college** · `#id`→Redmine ·
-*time* (when the signal was posted, e.g. `#prod_release`), the subject→thread,
-and a colored status chip; with per-bucket counts and a summary. Webhook URLs are
-secrets stored in `~/.lwchat/config.json` under `standup_webhooks` (alias → url),
-never in the repo; resolve with `--webhook <alias>`, or omit when only one is
-configured. The default window is **24h** (`--hours N` to widen, e.g. 72 on
-Mondays).
+Recognizes both standard tags and teammates' variants (e.g. `#movedToProduction`
+/ `#movedToQa`). **Full reference** — all flags, JSON shapes, vocabulary, team &
+cron setup — is in [recipes/standup.md](recipes/standup.md).
 
 ### Reply to a thread
 
