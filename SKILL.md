@@ -177,13 +177,16 @@ the bucket; Redmine `status` is shown as enrichment.
 
 Each item carries `subject` (the Redmine subject — recovered from the thread
 root's issue URL even when the thread isn't indexed yet; falls back to the root
-message text) and `thread_url` (a `https://chat.google.com/room/<space>/<thread>`
+message text), `college` (the issue's `College` Redmine custom field, e.g.
+`SCCZ`), and `thread_url` (a `https://chat.google.com/room/<space>/<thread>`
 deep link), so the report is readable without memorizing issue ids and each line
-links to its thread. When composing a Chat post from this, hyperlink with the
-`<thread_url|#id — subject>` markup. JSON shape: `{ ok, me, window_hours, count,
-buckets: { prod_release, qa_passed, qa_release, reopened, assigned, working },
-reassigned_away }` where each item is `{ bucket, issue_id, subject, space_alias,
-thread, thread_url, redmine_status, snippet, signal_time, signal_by }`.
+links to its thread. A line reads `#id · college · subject (status)`. When
+composing a Chat post from this, hyperlink with the `<thread_url|#id · college ·
+subject>` markup and number the items. JSON shape: `{ ok, me, window_hours,
+count, buckets: { prod_release, qa_passed, qa_release, reopened, assigned,
+working }, reassigned_away }` where each item is `{ bucket, issue_id, college,
+subject, space_alias, thread, thread_url, redmine_status, snippet, signal_time,
+signal_by }`.
 
 ### Reply to a thread
 

@@ -13,8 +13,9 @@ Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
   conventions (`#qa_release`, `#prod_release`, `#tested`, `#reopened`,
   `Assigned to @you`). Includes threads that @mention you or that you posted in;
   threads reassigned away are listed separately. Each item carries the issue
-  **subject** (recovered from the thread root's Redmine URL when not indexed) and
-  a **thread deep-link**, so the report is readable without memorizing issue ids.
+  **subject** (recovered from the thread root's Redmine URL when not indexed), the
+  **college** (Redmine `College` custom field), and a **thread deep-link**, so the
+  report is readable without memorizing issue ids.
   Fuzzy hashtag matching tolerates case/separator/typo variants. `--space` to
   narrow, `--json` for structured output.
 - **Thread opt-out (`#stoplwchat`)** — `reply` and `post --thread` append an
