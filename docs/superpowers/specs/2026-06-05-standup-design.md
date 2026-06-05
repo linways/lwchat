@@ -1,0 +1,194 @@
+# `lwchat standup` — design
+
+**Date:** 2026-06-05
+**Status:** Approved for planning
+
+## Problem
+
+Every weekday 10am the V4 team holds a standup: each dev reports what they did
+since yesterday — what went to production, what went to QA, what got reopened,
+what's still in progress, what was newly assigned. Today this means manually
+scrolling Google Chat threads. `lwchat standup` produces that report in one
+command by reading the team's existing chat conventions.
+
+## Observed workflow (the conventions this command reads)
+
+Almost all activity is in the `v4-exam-controller` space. The lifecycle of an
+issue from the developer's seat, with the chat signal that marks each step:
+
+| Signal (typical author) | Meaning |
+|---|---|
+| `Assigned to @<me>` (team lead) | work handed to me |
+| *(I post fixes, no tag)* | in progress |
+| `#qa_release @<tester>` (**me**) | I finished dev, sent to QA |
+| `QA #tested` / `#Tested` (tester) | QA passed |
+| `#reopened` / `#Reopened` (reviewer/tester) | failed QA / regression — back to me |
+| `#prod_release @<x>` (**me**) | I deployed to production |
+| `please deploy` / `please do the needful` (lead) | nudge (not a state change) |
+
+Notes that shape detection:
+- Hashtags vary in case (`#reopened`/`#Reopened`, `#Tested`/`#tested`) → matching
+  is **case-insensitive substring**.
+- `#qa_release` and `#prod_release` are *my* actions → counted only when **I**
+  authored the message.
+- `#tested` / `#reopened` are state changes from others → counted from **any**
+  author.
+- `Assigned to @<name>` carries a real `USER_MENTION` annotation → "assigned to
+  me" vs "reassigned away" is detected by comparing the mentioned user id to my
+  own, not by parsing the display name.
+
+## Behavior summary
+
+```
+lwchat standup [--hours N] [--space <alias>] [--json]
+```
+
+- Default window: **30 hours** (covers from ~yesterday 9am given a 10am
+  standup). `--hours N` overrides.
+- Space scope mirrors `inbox`: defaults to the learned `redmine_spaces`, or a
+  single `--space <alias>`, or the full default scope if nothing learned yet.
+- Buckets each relevant thread into one standup category and prints them grouped
+  (human) or as structured JSON.
+
+### Out of scope
+
+- Posting anything (read-only, like `inbox`).
+- Changing the team's hashtag conventions or Redmine.
+- A configurable signal vocabulary (hashtags are hard-coded constants for now;
+  revisit only if another team adopts the command).
+- Multi-window "smart Monday" logic — `--hours` covers it manually.
+
+## Architecture
+
+Mirrors `cmdInbox`'s two-phase scan, adding a classification layer. New pure
+module `lib/standup.js` owns the signal detection so it is unit-testable in
+isolation; `cmdStandup` in `lib/commands.js` does the scan + I/O.
+
+### Phase 1 — collect candidate threads (within the window)
+
+Scan the in-scope spaces with the same time-filtered pagination `inbox` uses
+(`createTime > cutoff`, `orderBy createTime desc`, page cap as backstop). A
+thread is a candidate if, within the window, **either**:
+- a message @mentions me (USER_MENTION annotation == my id), **or**
+- I authored a message (`sender.name == my id`).
+
+(Inbox does only the first; standup adds the second so my own `#qa_release` /
+`#prod_release` posts surface even when that thread didn't also @mention me.)
+
+Record per candidate thread: `space`, `space_alias`.
+
+### Phase 2 — classify each candidate thread
+
+Fetch the full thread (`listThreadMessages`). Pass its messages, my user id, and
+the window cutoff to the pure classifier:
+
+```
+classifyThread(messages, myId, cutoffIso) → {
+  signals: { prod_release, qa_release, tested, reopened, assigned_to_me, reassigned_away },  // booleans
+  bucket: "prod_release" | "qa_passed" | "qa_release" | "reopened" | "assigned" | "working" | null,
+  lastActivity, latestRelevant   // timestamps for sorting
+}
+```
+
+Signal detection (only messages with `createTime > cutoffIso` count):
+- `prod_release` — a message **I** authored whose text contains `#prod_release`
+  (case-insensitive).
+- `qa_release` — a message **I** authored containing `#qa_release`.
+- `tested` — **any** message containing `#tested`.
+- `reopened` — **any** message containing `#reopened`.
+- `assigned_to_me` — a message whose text contains `assigned to` (case-insensitive)
+  AND has a `USER_MENTION` annotation whose user id == my id.
+- `reassigned_away` — `assigned to` + a `USER_MENTION` of a **different** user id,
+  with no `assigned_to_me` in the window.
+
+Bucket = furthest stage reached, by this precedence (highest first):
+
+| Bucket key | Label | Condition |
+|---|---|---|
+| `prod_release` | 🚀 Released to prod | `prod_release` |
+| `qa_passed` | ✅ QA passed — ready to deploy | `tested` and not `prod_release` |
+| `qa_release` | 🧪 Sent to QA | `qa_release` and not `tested`/`prod_release` |
+| `reopened` | 🔴 Reopened — needs your fix | `reopened` and none of the above |
+| `assigned` | 🆕 Newly assigned to you | `assigned_to_me` and none of the above |
+| `working` | 🚧 Still working / other | candidate with none of the above |
+
+A thread classified **only** as `reassigned_away` (no other signal, not assigned
+to me) is excluded from the buckets and surfaced in a separate
+`reassigned_away` list (human: a short "handed off" footnote; JSON: its own
+array). This prevents another dev's reassignment from cluttering my standup
+while still letting me notice work that left my plate.
+
+### Enrichment
+
+Like `inbox`: resolve issue id from the thread→issue index, and (best-effort,
+only if `lwr` is on PATH) attach the Redmine `status`. Resolve author display
+names via the aggregated member map. Chat signals — not Redmine status — decide
+the bucket; status is shown alongside for context.
+
+## Output
+
+**Human:** a header line (`🗓 Standup — last 30h · N thread(s)`), then each
+non-empty bucket as a titled section in the precedence order above, each item:
+`#<issue> [space] <redmine_status>` / `<snippet>` / `<who/when of the deciding
+signal>`. A trailing "handed off" line for `reassigned_away`, if any. Empty →
+`Nothing to report. 🎉`.
+
+**JSON:**
+```json
+{
+  "ok": true,
+  "me": "users/<id>",
+  "window_hours": 30,
+  "count": 7,
+  "buckets": {
+    "prod_release": [ { "issue_id": "126592", "space_alias": "v4-exam-controller",
+                        "thread": "spaces/.../threads/...", "redmine_status": "Closed",
+                        "snippet": "...", "signal_time": "2026-06-04T...", "signal_by": "Sibin Baby" } ],
+    "qa_passed": [ … ], "qa_release": [ … ], "reopened": [ … ],
+    "assigned": [ … ], "working": [ … ]
+  },
+  "reassigned_away": [ … ]
+}
+```
+
+Within a bucket, items sort by `signal_time` descending (most recent first).
+
+## Components / files
+
+- **`lib/standup.js`** (new) — pure: `classifyThread(messages, myId, cutoffIso)`,
+  the bucket precedence, and the signal-matching constants (`#qa_release`,
+  `#prod_release`, `#tested`, `#reopened`, `assigned to`). One responsibility:
+  turn a thread's messages into a standup classification. No I/O.
+- **`lib/commands.js`** — `cmdStandup(opts, json)`: the two-phase scan + grouping
+  + human/JSON output. Reuses existing helpers (`getMe`, `listMessages`,
+  `listThreadMessages`, `mapWithConcurrency`, `loadIndex`/`normalizeLocations`,
+  `aggregatedMemberMap`, `getIssue`/`hasLwr`, `stripAutoFooter`, `spacesToScan`).
+- **`bin/lwchat.js`** — register the `standup` subcommand + usage line + flag
+  parsing (`--hours`, `--space`, `--json`).
+- **`test/standup.test.js`** (new) — `node:test` unit tests for `classifyThread`.
+- **`SKILL.md`** — document the command.
+
+## Testing / verification
+
+**Unit (`classifyThread`, pure — synthetic messages):**
+- prod_release: I post `#prod_release` → bucket `prod_release`.
+- qa_passed: tester posts `QA #tested`, I have not prod-released → `qa_passed`.
+- qa_release: I post `#qa_release`, no tested/prod → `qa_release`.
+- reopened: someone posts `#Reopened` (case variant) → `reopened`.
+- assigned: message `Assigned to @me` (annotation == myId) → `assigned`.
+- reassigned_away: `Assigned to @other` (annotation != myId), no other signal →
+  excluded from buckets, present in `reassigned_away`; `bucket` is null.
+- furthest-stage precedence: a thread with both `#reopened` and a later
+  (mine) `#qa_release` → `qa_release` (further stage), shown once.
+- authorship guard: a `#qa_release` posted by **someone else** does NOT set
+  `qa_release`; a `#tested` posted by anyone DOES set `tested`.
+- window guard: a `#prod_release` older than the cutoff is ignored.
+- case-insensitivity for every hashtag.
+
+**Manual (live, read-only against real spaces):**
+- `lwchat standup --json` returns buckets consistent with the last week's
+  observed messages (cross-check a few known issues: e.g. a `#prod_release`
+  thread lands in `prod_release`, a `#reopened` thread in `reopened`).
+- `lwchat standup` human output reads cleanly and groups correctly.
+- `--hours 168` widens the window; `--space v4-exam-controller` narrows scope.
+- Read-only: confirm the command never posts (no `sendMessage`/`postToSpace`).
