@@ -59,7 +59,8 @@ COMMANDS:
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
     digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
-    standup [--hours N] [--space <a>]   Your standup buckets: prod/qa/reopened/assigned/working (last 30h)
+    standup [--hours N] [--space <a>] [--card [--webhook <alias|url>]]
+                                        Your standup buckets (last 24h); --card posts a clickable card to a Chat webhook
     reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -124,11 +125,12 @@ async function main() {
   // (e.g. `reply <id> "msg" --json` must not append "--json" to the message).
   // Value-flags like --space / --client-id are NOT global; their command
   // handlers consume them positionally, so they stay in cleanArgs.
-  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep"]);
+  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep", "--card"]);
   const json = args.includes("--json");
   const caseSensitive = args.includes("--case-sensitive");
   const includeReplies = args.includes("--include-replies");
   const deep = args.includes("--deep");
+  const card = args.includes("--card");
   let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a));
 
   // Pull a value-flag (e.g. --space exam-controller) out of the args and
@@ -147,6 +149,7 @@ async function main() {
   const limitFlag = popFlag("--limit");
   const daysFlag = popFlag("--days"); // recency window — for `inbox`
   const hoursFlag = popFlag("--hours"); // recency window in hours — for `standup`
+  const webhookFlag = popFlag("--webhook"); // alias or url — for `standup --card`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
 
   // Dangling-flag detection: `lwchat post sp "msg" --attach` (no value
@@ -246,8 +249,8 @@ async function main() {
       }
 
       case "standup": {
-        const hours = hoursFlag ? parseInt(hoursFlag, 10) : 30;
-        await cmdStandup({ hours, spaceAlias: spaceFlag }, json);
+        const hours = hoursFlag ? parseInt(hoursFlag, 10) : 24;
+        await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag }, json);
         break;
       }
 
