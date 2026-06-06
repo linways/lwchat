@@ -151,6 +151,29 @@ items: [{ issue_id, space_alias, thread, mentioned_by, mention_time,
 awaiting_reply, last_activity, snippet, redmine_status }] }`. Read-only — great
 as the first call in a triage session, then `digest` the ones that need action.
 
+### Standup — your daily report
+
+```bash
+lwchat standup [--user <who>] [--card] [--hours N] [--space <a>] [--json]
+lwchat standup team list|add <who>|remove <who>     # who's in the scheduled run
+lwchat standup cron install|status|remove           # Mon–Sat 10:00 auto-post
+```
+
+Buckets a user's recent threads (default **24h**) — prod/qa/reopened/assigned/
+working — by the team's chat conventions, and can post a clickable Chat card.
+
+> **DEFAULT ACTION:** when the user asks for "my standup" / "daily summary" / "post
+> standups for X, Y, Z", **post the card** — do not hand-assemble plain text.
+> - one person → `lwchat standup --card --space v4-exam-controller` (default = you;
+>   another person → add `--user "<name>"`).
+> - several people → run it once **per name** (`--user`), one card each.
+> - no confirm needed (own summary space, pre-approved). Bare `standup` (no
+>   `--card`) only when they just want to read it.
+
+Recognizes both standard tags and teammates' variants (e.g. `#movedToProduction`
+/ `#movedToQa`). **Full reference** — all flags, JSON shapes, vocabulary, team &
+cron setup — is in [recipes/standup.md](recipes/standup.md).
+
 ### Reply to a thread
 
 ```bash

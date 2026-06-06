@@ -18,6 +18,9 @@ import {
   cmdDigest,
   cmdThreadShow,
   cmdInbox,
+  cmdStandup,
+  cmdStandupTeam,
+  cmdStandupCron,
   cmdBy,
   cmdReply,
   cmdPost,
@@ -58,6 +61,12 @@ COMMANDS:
     read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
     digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
+    standup [--user <name|email|id>] [--hours N] [--space <a>] [--card [--webhook <alias|url>]] [--team]
+                                        Standup buckets (last 24h, default = you; --user targets a teammate; --team runs every standup_team member); --card posts a clickable card to a Chat webhook
+    standup team list|add <who>|remove <who>
+                                        Manage standup_team (the members --team / the scheduled run cover)
+    standup cron install [--at HH:MM] [--days mon-sat] | status | remove
+                                        Schedule the Mon–Sat 10:00 auto-post (standup --team --card); logs to ~/.lwchat/cron/standup.log
     reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -122,11 +131,13 @@ async function main() {
   // (e.g. `reply <id> "msg" --json` must not append "--json" to the message).
   // Value-flags like --space / --client-id are NOT global; their command
   // handlers consume them positionally, so they stay in cleanArgs.
-  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep"]);
+  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep", "--card", "--team"]);
   const json = args.includes("--json");
   const caseSensitive = args.includes("--case-sensitive");
   const includeReplies = args.includes("--include-replies");
   const deep = args.includes("--deep");
+  const card = args.includes("--card");
+  const team = args.includes("--team");
   let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a));
 
   // Pull a value-flag (e.g. --space exam-controller) out of the args and
@@ -144,6 +155,10 @@ async function main() {
   const spacesFlag = popFlag("--spaces"); // comma-separated list
   const limitFlag = popFlag("--limit");
   const daysFlag = popFlag("--days"); // recency window — for `inbox`
+  const hoursFlag = popFlag("--hours"); // recency window in hours — for `standup`
+  const userFlag = popFlag("--user");   // standup: target user (name/email/id)
+  const atFlag = popFlag("--at");        // standup cron: time HH:MM
+  const webhookFlag = popFlag("--webhook"); // alias or url — for `standup --card`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
 
   // Dangling-flag detection: `lwchat post sp "msg" --attach` (no value
@@ -239,6 +254,15 @@ async function main() {
       case "inbox": {
         const days = daysFlag ? parseInt(daysFlag, 10) : 14;
         await cmdInbox({ days, spaceAlias: spaceFlag }, json);
+        break;
+      }
+
+      case "standup": {
+        const subc = cleanArgs[1];
+        if (subc === "team") { await cmdStandupTeam(cleanArgs[2], cleanArgs[3], json); break; }
+        if (subc === "cron") { await cmdStandupCron(cleanArgs[2], { at: atFlag, days: daysFlag }, json); break; }
+        const hours = hoursFlag ? parseInt(hoursFlag, 10) : 24;
+        await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag, user: userFlag, team }, json);
         break;
       }
 

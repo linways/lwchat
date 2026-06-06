@@ -7,6 +7,30 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ### Added
+- **standup: any user, team & schedule** — `standup --user <name|email|id>` runs
+  any teammate's standup; vocabulary now covers variants (`#movedToProduction` /
+  `#movedToQa` alongside `#prod_release`/`#qa_release`). `standup --team` posts a
+  card per `standup_team` member (managed via `standup team list|add|remove`).
+  `standup cron install [--at] [--days]` / `status` / `remove` schedules the
+  Mon–Sat 10:00 auto-post via a generic `lib/cron.js`; logs in `~/.lwchat/cron/`.
+  SKILL.md trimmed — full reference moved to `recipes/standup.md`.
+- **`standup --card`** — posts the standup as a clickable Google Chat card
+  (cardsV2) to a configured incoming webhook (`standup_webhooks` in
+  `~/.lwchat/config.json`, resolved by `--webhook <alias|url>`). Rich rows
+  (college · issue→Redmine · time, subject→thread, colored status chip), per-bucket
+  counts, and a summary. Also: the `standup` default window is now **24h** (was 30h).
+- **`standup` command** — read-only daily standup report. Buckets your recent
+  threads (default last 30h, `--hours N`) into prod_release / qa_passed /
+  qa_release / reopened / assigned / working by reading the team's chat
+  conventions (`#qa_release`, `#prod_release`, `#tested`, `#reopened`,
+  `Assigned to @you`). Includes threads that @mention you or that you posted in;
+  threads reassigned away are listed separately. Each item carries the issue
+  **subject** (recovered from the thread root's Redmine URL when not indexed), the
+  **college** (Redmine `College` custom field), a **Redmine issue URL**, and a
+  **thread deep-link**, so the report is readable without memorizing issue ids and
+  each line can link both to the issue and to its thread.
+  Fuzzy hashtag matching tolerates case/separator/typo variants. `--space` to
+  narrow, `--json` for structured output.
 - **Thread opt-out (`#stoplwchat`)** — `reply` and `post --thread` append an
   auto-generated footer telling people they can mute lwchat by replying with
   exactly `#stoplwchat`. lwchat then refuses to post in that thread
