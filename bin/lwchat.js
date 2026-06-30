@@ -17,6 +17,7 @@ import {
   cmdRead,
   cmdDigest,
   cmdThreadShow,
+  cmdAttachmentsFetch,
   cmdInbox,
   cmdStandup,
   cmdStandupTeam,
@@ -81,6 +82,8 @@ COMMANDS:
 
     threads [--space <alias>]           List recent threads
     thread show <thread_name>           Read any thread by name (spaces/<id>/threads/<id>) — works for non-Redmine threads
+    attachments fetch <issue_id> [--space <a>] [--out <dir>] [--force] [--all] [--transcribe]
+                      Download Chat voice/audio attachments into ~/.lwr/issues/<id>/chat-attachments/; --transcribe writes *_transcribed.json via voice-coder
     by      <user> [--space <a>] [--include-replies] [--limit N]
                                         A person's recent posts (top-level by default; --include-replies widens)
     index   [--space <alias>] [--deep]   Build/refresh the thread-to-issue index (--deep = one-time historical backfill)
@@ -131,14 +134,19 @@ async function main() {
   // (e.g. `reply <id> "msg" --json` must not append "--json" to the message).
   // Value-flags like --space / --client-id are NOT global; their command
   // handlers consume them positionally, so they stay in cleanArgs.
+  const attachmentsFetchRequested = args[0] === "attachments" && args[1] === "fetch";
   const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep", "--card", "--team"]);
+  const COMMAND_FLAGS = new Set(attachmentsFetchRequested ? ["--force", "--all", "--transcribe"] : []);
   const json = args.includes("--json");
   const caseSensitive = args.includes("--case-sensitive");
   const includeReplies = args.includes("--include-replies");
   const deep = args.includes("--deep");
   const card = args.includes("--card");
   const team = args.includes("--team");
-  let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a));
+  const force = attachmentsFetchRequested && args.includes("--force");
+  const all = attachmentsFetchRequested && args.includes("--all");
+  const transcribe = attachmentsFetchRequested && args.includes("--transcribe");
+  let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a) && !COMMAND_FLAGS.has(a));
 
   // Pull a value-flag (e.g. --space exam-controller) out of the args and
   // return its value plus the args with the flag+value removed. Used so the
@@ -160,6 +168,7 @@ async function main() {
   const atFlag = popFlag("--at");        // standup cron: time HH:MM
   const webhookFlag = popFlag("--webhook"); // alias or url — for `standup --card`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
+  const outFlag = attachmentsFetchRequested ? popFlag("--out") : undefined; // local output directory — for `attachments fetch`
 
   // Dangling-flag detection: `lwchat post sp "msg" --attach` (no value
   // after) leaves popFlag returning undefined, and the message would
@@ -169,6 +178,12 @@ async function main() {
   // shape — emit JSON when --json is set, plain stderr otherwise.
   if (attachFlag === undefined && args.includes("--attach")) {
     const msg = "--attach needs a value (local file path). Got nothing after --attach.";
+    if (json) console.log(JSON.stringify({ ok: false, error: msg }));
+    else console.error(`error: ${msg}`);
+    process.exit(1);
+  }
+  if (attachmentsFetchRequested && outFlag === undefined && args.includes("--out")) {
+    const msg = "--out needs a value (local directory path). Got nothing after --out.";
     if (json) console.log(JSON.stringify({ ok: false, error: msg }));
     else console.error(`error: ${msg}`);
     process.exit(1);
@@ -287,6 +302,21 @@ async function main() {
           await cmdThreadShow(name, json);
         } else {
           console.error("Usage: lwchat thread show <thread_name>");
+          process.exit(1);
+        }
+        break;
+      }
+
+      case "attachments": {
+        if (sub === "fetch") {
+          const issueId = cleanArgs[2];
+          if (!issueId) {
+            console.error("Usage: lwchat attachments fetch <issue_id> [--space <alias>] [--out <dir>] [--force] [--all] [--transcribe]");
+            process.exit(1);
+          }
+          await cmdAttachmentsFetch(issueId, { spaceAlias: spaceFlag, outDir: outFlag, force, includeAll: all, transcribe }, json);
+        } else {
+          console.error("Usage: lwchat attachments fetch <issue_id> [--space <alias>] [--out <dir>] [--force] [--all] [--transcribe]");
           process.exit(1);
         }
         break;
