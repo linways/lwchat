@@ -24,7 +24,9 @@ Each Redmine issue at your team gets a Google Chat thread where it's discussed (
 
 ```bash
 lwchat find 126235                          # which thread(s) discuss this issue?
-lwchat read 126235                          # full thread, with sender names resolved
+lwchat read 126235                          # read issue, thread, space, or DM targets
+lwchat read engineers-linways --limit 30     # catch up on a space
+lwchat read spaces/<id>/threads/<id> --analyze # read + download/transcribe attachments
 lwchat digest 126235                         # merged brief: Redmine status + chat timeline
 lwchat reply 126235 "deployed @Ranjith"     # post back, @mention auto-resolved
 
@@ -32,7 +34,6 @@ lwchat inbox                                # messages @mentioning you, awaiting
 lwchat post myspace "Hi team"               # top-level message to any space
 lwchat dm sibin@linways.com "ping"          # DM by email/name/id
 lwchat search "folio bug" --space cicd      # client-side search across spaces
-lwchat thread show spaces/<id>/threads/<id> # read any thread by name (Redmine or not)
 lwchat by "Akshay Chandran" --space cicd    # a person's recent posts (top-level by default)
 
 lwchat me     # who am I, which spaces am I in

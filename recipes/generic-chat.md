@@ -1,11 +1,23 @@
 ---
 name: generic-chat
-description: Patterns for using lwchat's generic Chat surface — posting to spaces (with or without a thread), DMing a person, searching, reading any thread by name (thread show), and listing a person's posts (by). These complement the Redmine-bridge commands (find/read/digest/reply).
+description: Patterns for using lwchat's generic Chat surface — reading any target, posting to spaces (with or without a thread), DMing a person, searching, and listing a person's posts (by). These complement the Redmine-bridge commands (find/digest/reply).
 ---
 
-# Generic Chat patterns (post / dm / search)
+# Generic Chat patterns (read / post / dm / search)
 
 When the request isn't tied to a Redmine issue — "send a message to the cicd space," "ask Krishnakumar something," "find that thread where someone mentioned the folio bug" — use these.
+
+## Read any target
+
+```bash
+lwchat read <target> [--json]
+lwchat read <target> --analyze [--json]
+```
+
+`<target>` can be a configured space alias, raw `spaces/<id>`, full
+`spaces/<id>/threads/<id>`, issue id, email, or person name. `--analyze`
+downloads/transcribes attachments into `/tmp/lwchat` and returns transcripts or
+file paths inline in `messages[].attachments[].analysis`.
 
 ## Post a top-level message to a space
 
@@ -112,25 +124,24 @@ SPACE=$(echo "$SEARCH" | jq -r '.results[0].space_alias')
 lwchat post "$SPACE" "Quick question — does this affect new admissions too?" --thread "$THREAD"
 ```
 
-Or read the whole thread `search` found — `thread show` takes the thread name
-directly (the space id is embedded in it, so no `--space` needed):
+Or read the whole thread `search` found — `read` accepts the thread name directly
+(the space id is embedded in it, so no `--space` needed):
 
 ```bash
 THREAD=$(lwchat search "..." --json | jq -r '.results[0].thread')
-lwchat thread show "$THREAD" --json
+lwchat read "$THREAD" --json
 ```
 
 ## Read any thread by name
 
 ```bash
-lwchat thread show <spaces/<id>/threads/<id>> [--json]
+lwchat read <spaces/<id>/threads/<id>> [--json]
+lwchat read <spaces/<id>/threads/<id>> --analyze [--json]
 ```
 
-The read-side mirror of `post --thread`. Unlike `read`/`digest` (which need a
-Redmine `issue_id`), this reads **any** thread — announcements, tool launches,
-generic discussion. Returns the same `messages[]` shape as `read`, plus
-participants and activity window. Hand it a bare `spaces/<id>` (a space, not a
-thread) and it tells you so and how to list that space's threads.
+The read-side mirror of `post --thread`. This reads **any** thread —
+announcements, tool launches, generic discussion — with the same uniform read
+shape used for issue, space, and DM reads.
 
 ## A person's recent posts
 

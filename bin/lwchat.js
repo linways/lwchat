@@ -16,8 +16,6 @@ import {
   cmdFind,
   cmdRead,
   cmdDigest,
-  cmdThreadShow,
-  cmdAttachmentsFetch,
   cmdInbox,
   cmdStandup,
   cmdStandupTeam,
@@ -59,7 +57,8 @@ COMMANDS:
     spaces remove <alias>               Remove a space
 
     find    <issue_id>                  Find the issue's thread(s) — reports every space it's in
-    read    <issue_id> [--space <a>]    Read the thread; --space picks one when in multiple
+    read    <target> [--as kind] [--limit N] [--analyze|--download] [--out <dir>]
+                      Read an issue/thread/space/DM/person with one uniform JSON shape; attachments are always listed
     digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
     standup [--user <name|email|id>] [--hours N] [--space <a>] [--card [--webhook <alias|url>]] [--team]
@@ -81,9 +80,6 @@ COMMANDS:
                                         Search messages across configured spaces (client-side scan)
 
     threads [--space <alias>]           List recent threads
-    thread show <thread_name>           Read any thread by name (spaces/<id>/threads/<id>) — works for non-Redmine threads
-    attachments fetch <issue_id> [--space <a>] [--out <dir>] [--force] [--all] [--transcribe]
-                      Download Chat voice/audio attachments into ~/.lwr/issues/<id>/chat-attachments/; --transcribe writes *_transcribed.json via voice-coder
     by      <user> [--space <a>] [--include-replies] [--limit N]
                                         A person's recent posts (top-level by default; --include-replies widens)
     index   [--space <alias>] [--deep]   Build/refresh the thread-to-issue index (--deep = one-time historical backfill)
@@ -134,18 +130,20 @@ async function main() {
   // (e.g. `reply <id> "msg" --json` must not append "--json" to the message).
   // Value-flags like --space / --client-id are NOT global; their command
   // handlers consume them positionally, so they stay in cleanArgs.
-  const attachmentsFetchRequested = args[0] === "attachments" && args[1] === "fetch";
+  const readRequested = args[0] === "read";
   const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep", "--card", "--team"]);
-  const COMMAND_FLAGS = new Set(attachmentsFetchRequested ? ["--force", "--all", "--transcribe"] : []);
+  const COMMAND_FLAGS = new Set([
+    ...(readRequested ? ["--force", "--analyze", "--download"] : []),
+  ]);
   const json = args.includes("--json");
   const caseSensitive = args.includes("--case-sensitive");
   const includeReplies = args.includes("--include-replies");
   const deep = args.includes("--deep");
   const card = args.includes("--card");
   const team = args.includes("--team");
-  const force = attachmentsFetchRequested && args.includes("--force");
-  const all = attachmentsFetchRequested && args.includes("--all");
-  const transcribe = attachmentsFetchRequested && args.includes("--transcribe");
+  const readForce = readRequested && args.includes("--force");
+  const analyze = readRequested && args.includes("--analyze");
+  const download = readRequested && args.includes("--download");
   let cleanArgs = args.filter((a) => !GLOBAL_FLAGS.has(a) && !COMMAND_FLAGS.has(a));
 
   // Pull a value-flag (e.g. --space exam-controller) out of the args and
@@ -168,7 +166,8 @@ async function main() {
   const atFlag = popFlag("--at");        // standup cron: time HH:MM
   const webhookFlag = popFlag("--webhook"); // alias or url — for `standup --card`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
-  const outFlag = attachmentsFetchRequested ? popFlag("--out") : undefined; // local output directory — for `attachments fetch`
+  const asFlag = readRequested ? popFlag("--as") : undefined; // read target hint: issue/thread/space/dm/person
+  const outFlag = readRequested ? popFlag("--out") : undefined; // local output directory — for read attachment downloads
 
   // Dangling-flag detection: `lwchat post sp "msg" --attach` (no value
   // after) leaves popFlag returning undefined, and the message would
@@ -182,8 +181,14 @@ async function main() {
     else console.error(`error: ${msg}`);
     process.exit(1);
   }
-  if (attachmentsFetchRequested && outFlag === undefined && args.includes("--out")) {
+  if (readRequested && outFlag === undefined && args.includes("--out")) {
     const msg = "--out needs a value (local directory path). Got nothing after --out.";
+    if (json) console.log(JSON.stringify({ ok: false, error: msg }));
+    else console.error(`error: ${msg}`);
+    process.exit(1);
+  }
+  if (readRequested && asFlag === undefined && args.includes("--as")) {
+    const msg = "--as needs a value (issue, thread, space, dm, or person). Got nothing after --as.";
     if (json) console.log(JSON.stringify({ ok: false, error: msg }));
     else console.error(`error: ${msg}`);
     process.exit(1);
@@ -247,12 +252,13 @@ async function main() {
       }
 
       case "read": {
-        const issueId = cleanArgs[1];
-        if (!issueId) {
-          console.error("Usage: lwchat read <issue_id> [--space <alias>]");
+        const target = cleanArgs[1];
+        if (!target) {
+          console.error("Usage: lwchat read <target> [--as issue|thread|space|dm|person] [--limit N] [--analyze|--download] [--out <dir>]");
           process.exit(1);
         }
-        await cmdRead(issueId, spaceFlag, json);
+        const limit = limitFlag ? parseInt(limitFlag, 10) : 30;
+        await cmdRead(target, { spaceAlias: spaceFlag, asHint: asFlag, limit, analyze, download, outDir: outFlag, force: readForce }, json);
         break;
       }
 
@@ -289,36 +295,6 @@ async function main() {
         }
         const limit = limitFlag ? parseInt(limitFlag, 10) : 10;
         await cmdBy(user, { spaceAlias: spaceFlag, includeReplies, limit }, json);
-        break;
-      }
-
-      case "thread": {
-        if (sub === "show") {
-          const name = cleanArgs[2];
-          if (!name) {
-            console.error("Usage: lwchat thread show <thread_name>");
-            process.exit(1);
-          }
-          await cmdThreadShow(name, json);
-        } else {
-          console.error("Usage: lwchat thread show <thread_name>");
-          process.exit(1);
-        }
-        break;
-      }
-
-      case "attachments": {
-        if (sub === "fetch") {
-          const issueId = cleanArgs[2];
-          if (!issueId) {
-            console.error("Usage: lwchat attachments fetch <issue_id> [--space <alias>] [--out <dir>] [--force] [--all] [--transcribe]");
-            process.exit(1);
-          }
-          await cmdAttachmentsFetch(issueId, { spaceAlias: spaceFlag, outDir: outFlag, force, includeAll: all, transcribe }, json);
-        } else {
-          console.error("Usage: lwchat attachments fetch <issue_id> [--space <alias>] [--out <dir>] [--force] [--all] [--transcribe]");
-          process.exit(1);
-        }
         break;
       }
 
