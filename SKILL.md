@@ -332,6 +332,40 @@ the same `messages[]` shape as `read`, plus `participants` / `first_activity` /
 bare `spaces/<id>` (a space, not a thread) and it tells you so and how to list
 that space's threads.
 
+### Download Chat attachments into an issue folder
+
+```bash
+lwchat attachments fetch <issue_id> [--space <alias>] [--json]
+lwchat attachments fetch <issue_id> --all [--json]
+lwchat attachments fetch <issue_id> --out <dir> [--force] [--json]
+lwchat attachments fetch <issue_id> --transcribe [--json]
+```
+
+Downloads file attachments from the issue's Chat thread(s). By default this is
+voice/audio only (`audio/*`) and writes into the same local issue tree used by
+`lwr issue fetch`: `~/.lwr/issues/<id>/chat-attachments/`. If that issue folder
+doesn't exist yet, lwchat runs `lwr issue fetch <id> --json` to materialize it.
+Saved filenames are prefixed with the Chat message timestamp and sender display
+name, for example
+`2026-06-16T103717Z_Bhavishma_Chandran_M.m4a`.
+Pass `--all` to include every downloadable Chat attachment (PDFs/images/etc.),
+or `--out <dir>` to write somewhere else. Existing files are reused unless
+`--force` is passed.
+
+Pass `--transcribe` when you need voice-note text. lwchat calls the local
+`voice-coder analyze <audio-file>` tool for each downloaded `audio/*` file and
+writes a sidecar JSON file with the same base name plus `_transcribed`, for
+example `2026-06-16T103717Z_Bhavishma_Chandran_M_transcribed.json`. Each sidecar
+contains `{ file, profile, text, source, transcribed_at }`. Use these files when
+summarizing issue context; the original audio files and transcripts live beside
+each other in `~/.lwr/issues/<id>/chat-attachments/` unless `--out` was used.
+
+JSON shape: `{ ok, issue_id, mode, lwr_issue_dir, target_dir,
+issue_materialized, threads, counts, entries, skipped }`. `entries[]` includes
+`sender`, `sender_name`, `content_name`, `content_type`, `message_name`, `path`,
+`bytes`, `from_cache`, and when requested `transcription`. A `manifest.json`
+with the same data is written beside the files.
+
 ### A person's recent posts
 
 ```bash

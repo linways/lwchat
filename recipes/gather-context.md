@@ -32,9 +32,20 @@ description/attachments (`lwr issue view`) or the chat side alone (`lwchat read`
    lwchat read <id> --json
    ```
 
+   If the thread includes voice/audio attachments or empty-text messages that
+   look like uploaded voice notes, fetch and transcribe them into the issue
+   folder:
+   ```bash
+   lwchat attachments fetch <id> --transcribe --json
+   ```
+   This writes audio files and `<timestamp>_<sender>_transcribed.json` sidecars
+   under `~/.lwr/issues/<id>/chat-attachments/`. Use the JSON sidecars as part
+   of the issue context; their filenames identify the message time and speaker.
+
 3. Combine insights:
    - Redmine gives you: subject, status, priority, assignee, description, attachments
    - Chat gives you: informal discussion, decisions, blockers, mentions of related work
+   - Chat voice transcripts give you: spoken clarifications that were not present in message text
 
 4. If the chat thread has messages, summarize the discussion for context before proceeding with the task.
 
