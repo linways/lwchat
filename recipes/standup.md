@@ -42,4 +42,11 @@ Webhooks live in `~/.lwchat/config.json` `standup_webhooks` (alias→url, secret
 ## Schedule
 `standup cron install` writes a Mon–Sat 10:00 crontab block running
 `standup --team --card`, logging to `~/.lwchat/cron/standup.log`. Unattended runs
-use the stored refresh token (no re-login). Machine must be on at the time.
+use the stored refresh token (no re-login). The crontab line carries `PATH` (so
+`lwr`/`node` resolve) plus `XDG_RUNTIME_DIR` + `DBUS_SESSION_BUS_ADDRESS` so `lwr`
+can read its API key from the OS keyring for Redmine enrichment (subject/college/
+status). **Requirements at the scheduled time:** the machine must be **on**, and
+the user must be **logged into their desktop session** (keyring unlocked, session
+D-Bus running) — otherwise `lwr` can't reach the keyring and cards degrade to raw
+thread text with no subject/college/status. Re-run `cron install` after a node
+(nvm) version change, since the baked paths are absolute.
