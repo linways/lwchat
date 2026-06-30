@@ -86,35 +86,57 @@ lwchat find <issue_id> [--json]
 
 Reports **every** space the issue's thread appears in (the same issue is often cross-posted to multiple spaces). `--json` returns `{ ok, issue_id, count, locations: [{ space_alias, thread, ... }] }`. Locations are cached in `~/.lwchat/cache/thread-index.json`.
 
-### Read thread discussion
+### Read any Chat target
 
 ```bash
-lwchat read <issue_id> [--space <alias>] [--json]
+lwchat read <target> [--as issue|thread|space|dm|person] [--limit N] [--json]
+lwchat read <target> --download [--out <dir>] [--force] [--json]
+lwchat read <target> --analyze [--out <dir>] [--force] [--json]
 ```
 
-Returns messages chronologically, sender IDs resolved to names. If the issue is in **one** space, reads it. If in **multiple**, reads them all unless you pass `--space <alias>` to pick one. Messages are **always fetched live** — the cache only stores the thread location, never message content.
+`read` is the single read surface. `<target>` can be an issue id (`127047`), a
+thread name (`spaces/<id>/threads/<id>`), a space id, a configured space alias,
+an email, or a person's name. Resolution is deterministic and echoed in JSON via
+`kind`, `target`, and `resolved_from`. `--as` forces an interpretation when you
+need it. DM reads never create a DM; if no DM exists, lwchat fails and tells you
+to send one first.
 
-**JSON shape** (always a `threads` array, one per matching space):
+Messages are always fetched live. Attachment metadata is always present on every
+message as `attachments` (empty array when none). This costs no extra API calls
+because Google Chat includes `attachment[]` in `messages.list`.
+
+Use `--download` to download attachment bytes. Use `--analyze` when you want
+understandable content in one call: audio is downloaded and transcribed with the
+local `voice-coder analyze` tool, images/docs are downloaded and returned as
+paths. By default these files go under deterministic `/tmp/lwchat/...` paths;
+pass `--out <dir>` to persist them somewhere else, for example
+`--out ~/.lwr/issues/<id>/chat-attachments`.
+
+Downloaded filenames use underscore-only `timestamp_sender.ext`, for example
+`2026-06-16T103717Z_Bhavishma_Chandran_M.m4a`. Audio transcripts are sidecar JSON
+files named `timestamp_sender_transcribed.json` and include `{ file, profile,
+text, source, transcribed_at }`.
+
+**JSON shape** is uniform for issue, thread, space, and DM reads:
 ```json
 {
   "ok": true,
-  "issue_id": "126270",
-  "count": 1,
-  "threads": [
+  "kind": "thread",
+  "target": { "space": "spaces/AAA", "space_alias": "exam-controller", "thread": "spaces/AAA/threads/BBB", "user": null, "user_name": null },
+  "resolved_from": "spaces/AAA/threads/BBB",
+  "message_count": 5,
+  "participants": ["Muhammed Rameez"],
+  "first_activity": "2026-05-25T07:43:57.913327Z",
+  "last_activity": "2026-05-25T08:10:00.000000Z",
+  "messages": [
     {
-      "space_alias": "exam-controller",
-      "thread": "spaces/AAAAdOaHhRY/threads/j7YSIlbB5jc",
-      "message_count": 5,
-      "messages": [
-        {
-          "sender": "users/117334358123398955954",
-          "sender_name": "Muhammed Rameez",
-          "sender_type": "HUMAN",
-          "text": "the actual message text",
-          "created": "2026-05-25T07:43:57.913327Z",
-          "is_reply": false
-        }
-      ]
+      "sender": "users/117334358123398955954",
+      "sender_name": "Muhammed Rameez",
+      "sender_type": "HUMAN",
+      "text": "the actual message text",
+      "created": "2026-05-25T07:43:57.913327Z",
+      "is_reply": false,
+      "attachments": []
     }
   ]
 }
@@ -319,52 +341,14 @@ Lists recent threads with first messages. With `--json`, enriches each thread wi
 ### Read a thread by name (any thread, Redmine or not)
 
 ```bash
-lwchat thread show <thread_name> [--json]
+lwchat read <thread_name> [--json]
+lwchat read <thread_name> --analyze [--json]
 ```
 
-The read-side mirror of `post --thread`. `read`/`digest` need a Redmine
-`issue_id`; this reads **any** thread directly by its `spaces/<id>/threads/<id>`
-name — including announcements, tool launches, and other non-Redmine threads
-that have no issue. Get a thread name from `threads --json` or `search --json`.
-The space id is embedded in the thread name, so no `--space` is needed. Returns
-the same `messages[]` shape as `read`, plus `participants` / `first_activity` /
-`last_activity`, and `issue_id` if the starter happens to link one. Hand it a
-bare `spaces/<id>` (a space, not a thread) and it tells you so and how to list
-that space's threads.
-
-### Download Chat attachments into an issue folder
-
-```bash
-lwchat attachments fetch <issue_id> [--space <alias>] [--json]
-lwchat attachments fetch <issue_id> --all [--json]
-lwchat attachments fetch <issue_id> --out <dir> [--force] [--json]
-lwchat attachments fetch <issue_id> --transcribe [--json]
-```
-
-Downloads file attachments from the issue's Chat thread(s). By default this is
-voice/audio only (`audio/*`) and writes into the same local issue tree used by
-`lwr issue fetch`: `~/.lwr/issues/<id>/chat-attachments/`. If that issue folder
-doesn't exist yet, lwchat runs `lwr issue fetch <id> --json` to materialize it.
-Saved filenames are prefixed with the Chat message timestamp and sender display
-name, for example
-`2026-06-16T103717Z_Bhavishma_Chandran_M.m4a`.
-Pass `--all` to include every downloadable Chat attachment (PDFs/images/etc.),
-or `--out <dir>` to write somewhere else. Existing files are reused unless
-`--force` is passed.
-
-Pass `--transcribe` when you need voice-note text. lwchat calls the local
-`voice-coder analyze <audio-file>` tool for each downloaded `audio/*` file and
-writes a sidecar JSON file with the same base name plus `_transcribed`, for
-example `2026-06-16T103717Z_Bhavishma_Chandran_M_transcribed.json`. Each sidecar
-contains `{ file, profile, text, source, transcribed_at }`. Use these files when
-summarizing issue context; the original audio files and transcripts live beside
-each other in `~/.lwr/issues/<id>/chat-attachments/` unless `--out` was used.
-
-JSON shape: `{ ok, issue_id, mode, lwr_issue_dir, target_dir,
-issue_materialized, threads, counts, entries, skipped }`. `entries[]` includes
-`sender`, `sender_name`, `content_name`, `content_type`, `message_name`, `path`,
-`bytes`, `from_cache`, and when requested `transcription`. A `manifest.json`
-with the same data is written beside the files.
+The read-side mirror of `post --thread`. This reads **any** thread directly by
+its `spaces/<id>/threads/<id>` name — including announcements, tool launches,
+and non-Redmine threads. Get a thread name from `threads --json` or
+`search --json`.
 
 ### A person's recent posts
 
