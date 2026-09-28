@@ -30,6 +30,24 @@ install and auth below happen once, here.
 No Cloud Console setup is needed — lwchat ships a bundled OAuth client for
 the Linways Workspace (internal consent screen, no "unverified app" warning).
 
+## Optional: move the refresh token off disk (`$LWCHAT_TOKEN_COMMAND`)
+
+Steps 1-4 leave a long-lived refresh token in `~/.lwchat/tokens.json`. On an
+agent host you can keep it in the Secure Vault instead and have a broker mint
+a short-lived access token per invocation:
+
+5. Store the refresh token from `~/.lwchat/tokens.json` in a Secure Vault
+   connector, via the secure link — never paste it into chat.
+6. Set `LWCHAT_TOKEN_COMMAND` to a broker command that prints a fresh Google
+   access token on stdout. lwchat runs it once per CLI invocation and
+   **never writes what it prints** — no cache file, no tokens.json update.
+7. Delete `~/.lwchat/tokens.json`, then check `lwchat doctor` reports
+   `$LWCHAT_TOKEN_COMMAND (minted per invocation, never stored)`.
+
+The hook takes precedence over `tokens.json` whenever it is set. With it set,
+lwchat attempts no token refresh of its own — the broker owns that, and
+lwchat has no refresh token to refresh with.
+
 ## Forbidden
 
 - Running `lwchat auth login` in the foreground.
@@ -38,6 +56,7 @@ the Linways Workspace (internal consent screen, no "unverified app" warning).
 - Sending the user the auth URL to open on their own device — the loopback
   callback can't reach this VM from there.
 - Copying tokens out of `~/.lwchat/tokens.json` or asking the user for them.
+- Echoing what `$LWCHAT_TOKEN_COMMAND` prints, or writing it to any file.
 - There is no device flow and no manual code-paste fallback — don't invent one.
 
 ## If something breaks
@@ -46,3 +65,6 @@ the Linways Workspace (internal consent screen, no "unverified app" warning).
   time. Run it again in the background and redo the browser step promptly.
 - `lwchat doctor` failures after a good login: report the failing check
   verbatim and stop — don't reach for another credential path.
+- `AUTH_TOKEN_COMMAND_FAILED`: the broker command failed (`reason` is the
+  exit code, or `timeout` after 10s). Report it and stop — do not fall back
+  to `tokens.json` or any other credential path.
