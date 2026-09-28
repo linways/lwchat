@@ -38,7 +38,9 @@ const DATA_DIR = path.join(HOME, ".lwchat");
 const SKILL_DIR = path.join(DATA_DIR, "skill");
 const CANONICAL_SKILL = path.join(SKILL_DIR, "SKILL.md");
 const CANONICAL_RECIPES = path.join(SKILL_DIR, "recipes");
+const CANONICAL_MUSE = path.join(SKILL_DIR, "MUSE.md");
 const REPO_SKILL = path.join(REPO_ROOT, "SKILL.md");
+const REPO_MUSE = path.join(REPO_ROOT, "MUSE.md");
 const REPO_RECIPES = path.join(REPO_ROOT, "recipes");
 const REPO_PKG = path.join(REPO_ROOT, "package.json");
 const SKILL_NAME = "lwchat";
@@ -51,6 +53,7 @@ const AI_TOOLS = [
   { id: "copilot", name: "GitHub Copilot", parent: ".copilot", skillsRel: ".copilot/skills" },
   { id: "codex", name: "Codex CLI", parent: ".codex", skillsRel: ".codex/skills" },
   { id: "antigravity", name: "Gemini Antigravity", parent: ".gemini", skillsRel: ".gemini/antigravity/skills" },
+  { id: "muse", name: "Muse", parent: "workspace/skills", skillsRel: "workspace/skills" },
 ];
 
 const C = {
@@ -224,8 +227,9 @@ function uninstall() {
     const skillDir = path.join(HOME, tool.skillsRel, SKILL_NAME);
     const target = path.join(skillDir, "SKILL.md");
     const recipesTarget = path.join(skillDir, "recipes");
+    const museTarget = path.join(skillDir, "MUSE.md");
     let removed = false;
-    for (const p of [target, recipesTarget]) {
+    for (const p of [target, recipesTarget, museTarget]) {
       if (fs.existsSync(p) || isBrokenSymlink(p)) {
         try {
           const st = fs.lstatSync(p);
@@ -324,6 +328,11 @@ function refreshCanonicalSkill() {
   fs.utimesSync(CANONICAL_SKILL, new Date(), new Date());
   ok(`canonical skill snapshot → ${CANONICAL_SKILL}`);
 
+  if (fs.existsSync(REPO_MUSE)) {
+    fs.copyFileSync(REPO_MUSE, CANONICAL_MUSE);
+    ok(`canonical guide snapshot → ${CANONICAL_MUSE}`);
+  }
+
   if (fs.existsSync(REPO_RECIPES) && fs.statSync(REPO_RECIPES).isDirectory()) {
     if (fs.existsSync(CANONICAL_RECIPES)) {
       fs.rmSync(CANONICAL_RECIPES, { recursive: true, force: true });
@@ -393,6 +402,24 @@ function installSkillFor(tool) {
       ok(`${tool.name}: ${recipesLink} → ${C.dim}${CANONICAL_RECIPES}${C.reset}`);
     } catch (err) {
       warn(`${tool.name}: failed to symlink recipes — ${(err && err.message) || err}`);
+    }
+  }
+
+  if (fs.existsSync(CANONICAL_MUSE)) {
+    const museLink = path.join(skillDir, "MUSE.md");
+    if (fs.existsSync(museLink) || isBrokenSymlink(museLink)) {
+      try {
+        fs.unlinkSync(museLink);
+      } catch (err) {
+        warn(`${tool.name}: could not remove existing ${museLink}: ${(err && err.message) || err}`);
+        return;
+      }
+    }
+    try {
+      fs.symlinkSync(CANONICAL_MUSE, museLink, "file");
+      ok(`${tool.name}: ${museLink} → ${C.dim}${CANONICAL_MUSE}${C.reset}`);
+    } catch (err) {
+      warn(`${tool.name}: failed to symlink MUSE.md — ${(err && err.message) || err}`);
     }
   }
 }
@@ -608,6 +635,23 @@ Then:
 
 ${C.bold}When the repo updates:${C.reset}
   ${C.green}./install.sh update${C.reset}
+`);
+
+  const muse = AI_TOOLS.find((t) => t.id === "muse");
+  if (muse && toolDetected(muse)) printMuseBriefing();
+}
+
+function printMuseBriefing() {
+  console.log(`${C.bold}Muse agents — read this before authenticating:${C.reset}
+  1. Run ${C.green}lwchat auth login${C.reset} yourself, as a ${C.bold}background${C.reset} process. It blocks up
+     to 120s; foreground makes you look frozen. It prints the auth URL in 1-2s.
+  2. Open that URL in ${C.bold}this session's live browser${C.reset} and hand control to the user
+     to sign in with their @linways.com account. The OAuth callback goes to
+     http://localhost:<random-port> on THIS VM — the user's own phone or laptop
+     browser cannot reach it, so don't send them the URL to open there.
+  3. Verify with ${C.green}lwchat doctor${C.reset} (expect 8 ok / 0 fail).
+
+  Full guide: ${CANONICAL_MUSE}
 `);
 }
 

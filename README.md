@@ -13,7 +13,7 @@
 ## Who is this README for
 
 - **AI agent installing lwchat for the first time** — follow Steps 1–4 below. After `lwchat doctor` passes in Step 3, your *runtime* reference is **[SKILL.md](SKILL.md)** (already snapshotted into your skill directory by the installer). Stop reading this file and switch there.
-- **Human user** — point your AI agent at this repo and say *"install lwchat from `github.com/linways/lwchat` and walk me through auth."* The agent will follow the steps below and prompt you only where it needs your input (the Google Cloud console screens in Step 2).
+- **Human user** — point your AI agent at this repo and say *"install lwchat from `github.com/linways/lwchat` and walk me through auth."* The agent will follow the steps below and prompt you only where it needs your input (the Google Cloud console screens in Step 2). Full agent guide: [MUSE.md](MUSE.md).
 - **Developer contributing to lwchat itself** — this README will not cover internals. See **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** for project layout, conventions, and how to add a command.
 
 ---
