@@ -46,6 +46,8 @@ node install.mjs install
 ```
 This links the `lwchat` binary, snapshots this skill to `~/.lwchat/skill/`, symlinks it into detected AI tools, and grants Claude Code `Read(~/.lwchat/**)`.
 
+**Muse agents:** before installing or authenticating, read `MUSE.md` — `~/.lwchat/skill/MUSE.md`, or the repo root if you have the clone. The Google OAuth loopback must complete in this session's browser; the user's own device can't reach the callback.
+
 **Authenticate** — you (the agent) run this, in the background, and surface the printed URL to the user:
 
 > `lwchat auth login` — spawn with `run_in_background: true` in Claude Code's Bash tool (equivalent in Codex/Copilot). DO NOT run it foreground — it blocks for up to 120s waiting for the OAuth callback and your loop will appear frozen. DO NOT tell the user to "type this yourself" — that's a handoff, you can handle it.
