@@ -7,6 +7,16 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ### Added
+- **`$LWCHAT_TOKEN_COMMAND` broker hook** — a command that prints a short-lived
+  Google access token on stdout, run once per CLI invocation and never
+  persisted, so the long-lived refresh token can live in a vault instead of
+  `~/.lwchat/tokens.json`. Takes precedence over the file, which is not read
+  while the hook is set; no token refresh is attempted on this path (the
+  broker owns it). 10s deadline enforced as a hard bound with a process-group
+  kill, so a hung broker can't hang the CLI. Failures raise
+  `AUTH_TOKEN_COMMAND_FAILED` carrying the exit code or `timeout` plus a
+  redacted first line of stderr — never stdout. `doctor` reports the token
+  source; `auth login` flags a now-redundant `tokens.json`.
 - **standup: any user, team & schedule** — `standup --user <name|email|id>` runs
   any teammate's standup; vocabulary now covers variants (`#movedToProduction` /
   `#movedToQa` alongside `#prod_release`/`#qa_release`). `standup --team` posts a

@@ -124,6 +124,28 @@ Steps to create the client:
 4. Credentials → Create OAuth client ID → Application type *Desktop app*; copy `client_id` and `client_secret`.
 5. Chat API → Configuration: App name `lwchat`, Pub/Sub topic `projects/<your-project-id>/topics/lwchat` (topic doesn't need to exist).
 
+### Secret broker — `$LWCHAT_TOKEN_COMMAND`
+
+On a host where a long-lived refresh token shouldn't sit on disk, point lwchat
+at a command that prints a short-lived Google **access token** on stdout:
+
+```bash
+export LWCHAT_TOKEN_COMMAND='my-broker mint-google-token'
+```
+
+lwchat runs it once per CLI invocation (via `sh -c`, so pipelines work), uses
+the first line of stdout as the Bearer token, and **never persists it** — no
+cache file, no `tokens.json` write. The refresh token can then live in a vault
+and the broker mints from it.
+
+Precedence: the hook beats `tokens.json`, which is not read at all while it is
+set. lwchat also performs no token refresh on this path — the broker owns the
+refresh dance. `lwchat auth login` still works as the bootstrap that mints the
+refresh token you move into the vault; it warns that `tokens.json` is now
+redundant. `lwchat doctor` reports the source, and failures surface as
+`AUTH_TOKEN_COMMAND_FAILED` with the exit code (or `timeout` after 10s) and a
+redacted first line of stderr — never the command's stdout.
+
 ### Existing `gws` users
 
 If the user already has [`gws`](https://github.com/googleworkspace/cli) authenticated, you can reuse its credentials in one command:
