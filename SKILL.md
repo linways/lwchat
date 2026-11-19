@@ -187,11 +187,11 @@ lwchat mentions [--user <name|email|users/id>] [--spaces a,b] [--space a]
                 [--date YYYY-MM-DD | --from YYYY-MM-DD [--to YYYY-MM-DD]] [--json]
 ```
 
-Threads where someone was @mentioned, grouped by IST day (default: today; `--from` alone = through today). No `--user` = everyone mentioned (`@all` skipped). Default spaces = `redmine_spaces`. Ids are raw `users/<id>`.
+Threads where someone was @mentioned, grouped by IST day (default: today; `--from` alone = through today). No `--user` = everyone mentioned (`@all` skipped). Default spaces = `redmine_spaces`. Ids are raw `users/<id>`. `truncated` lists space aliases that hit the 300-page scan cap (results for them are incomplete).
 
 ```json
 { "ok": true, "from": "2026-11-19", "to": "2026-11-19", "timezone": "Asia/Kolkata",
-  "spaces": ["v4-exam-controller"], "count": 1,
+  "spaces": ["v4-exam-controller"], "truncated": [], "count": 1,
   "days": [{ "day": "2026-11-19", "items": [{
     "mentioned_user": "users/123", "mentioned_name": "Name",
     "space_id": "spaces/AAAA", "space_alias": "v4-exam-controller",
