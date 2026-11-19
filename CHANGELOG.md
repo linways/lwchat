@@ -29,6 +29,7 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
   fallback, `index`, `threads` and `read`.
 
 ### Added
+- **`lwchat mentions`** — threads where people were @mentioned, grouped by IST day (`--user`, `--spaces`, `--date`/`--from`/`--to`, `--json`).
 - **Space catalog + allowed list** (ADR-017). `lwchat spaces sync` catalogs every
   space, DM and group chat you're in (`cache/spaces.json`, auto-refreshed daily).
   `lwchat spaces allow|disallow <alias|id|name>` edit the allowed list

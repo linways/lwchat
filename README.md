@@ -31,6 +31,7 @@ lwchat digest 126235                         # merged brief: Redmine status + ch
 lwchat reply 126235 "deployed @Ranjith"     # post back, @mention auto-resolved
 
 lwchat inbox                                # messages @mentioning you, awaiting your reply
+lwchat mentions [--user <who>] [--date D]   # threads where people were @mentioned, by IST day
 lwchat post myspace "Hi team"               # top-level message to any space
 lwchat dm sibin@linways.com "ping"          # DM by email/name/id
 lwchat find 126235 --scan                   # also scan allowed Redmine spaces for bot-started threads (slow)

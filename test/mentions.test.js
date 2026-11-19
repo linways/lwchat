@@ -83,3 +83,14 @@ test("userId filter", () => {
 test("message without thread.name is ignored", () => {
   assert.deepEqual(collectMentions([msg({ thread: null, mentions: ["users/U1"] })]), []);
 });
+
+import { resolveRange } from "../lib/mentions.js";
+test("resolveRange validates and defaults", () => {
+  const now = new Date("2026-11-19T10:00:00Z");
+  assert.deepEqual(resolveRange({}, now), { from: "2026-11-19", to: "2026-11-19" });
+  assert.deepEqual(resolveRange({ from: "2026-11-15" }, now), { from: "2026-11-15", to: "2026-11-19" });
+  assert.deepEqual(resolveRange({ date: "2026-11-10" }, now), { from: "2026-11-10", to: "2026-11-10" });
+  assert.throws(() => resolveRange({ date: "2026-13-01" }, now), /real date/);
+  assert.throws(() => resolveRange({ date: "2026-02-30" }, now), /real date/);
+  assert.throws(() => resolveRange({ from: "2026-11-20", to: "2026-11-19" }, now), /later than/);
+});
