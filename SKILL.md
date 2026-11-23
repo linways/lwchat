@@ -180,6 +180,31 @@ items: [{ issue_id, space_alias, thread, mentioned_by, mention_time,
 awaiting_reply, last_activity, snippet, redmine_status }] }`. Read-only — great
 as the first call in a triage session, then `digest` the ones that need action.
 
+### Mentions — day-wise
+
+```
+lwchat mentions [--user <name|email|users/id>] [--spaces a,b] [--space a] [--allowed-only]
+                [--date YYYY-MM-DD | --from YYYY-MM-DD [--to YYYY-MM-DD]] [--json]
+```
+
+Threads where someone was @mentioned, grouped by IST day (default: today; `--from` alone = through today). Ids are raw `users/<id>`. `method` says how it ran:
+
+- **`--user <who>` → `chat_search`**: one Google Chat server-side search on that user's mention annotation, across every space you're in (`--spaces` / `--allowed-only` narrow it; `spaces` is `"catalog"` by default). Seconds. Misses mentions inside bot / Chat-app posts (e.g. Redmine Notifier) and muted spaces.
+- **No `--user` → `scan`**: everyone mentioned (`@all` skipped), page-by-page over `redmine_spaces` (or `--spaces`). Slow (about a minute for 7 days), because search has no reliable "any mention" filter. `truncated` lists aliases that hit the 300-page cap.
+
+```json
+{ "ok": true, "from": "2026-11-19", "to": "2026-11-19", "timezone": "Asia/Kolkata",
+  "method": "scan", "spaces": ["v4-exam-controller"], "truncated": [], "count": 1,
+  "days": [{ "day": "2026-11-19", "items": [{
+    "mentioned_user": "users/123", "mentioned_name": "Name",
+    "space_id": "spaces/AAAA", "space_alias": "v4-exam-controller",
+    "thread": "spaces/AAAA/threads/xyz", "thread_url": "https://chat.google.com/room/AAAA/xyz",
+    "issue_id": "126235", "title": "…", "title_by": "Name", "thread_started_at": "ISO",
+    "last_message": "…", "last_message_by": "Name", "last_message_at": "ISO",
+    "mentioned_by": ["Name A"], "mention_count": 1,
+    "first_mention_at": "ISO", "last_mention_at": "ISO" }] }] }
+```
+
 ### Standup — your daily report
 
 ```bash

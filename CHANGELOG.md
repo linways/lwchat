@@ -29,6 +29,7 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
   fallback, `index`, `threads` and `read`.
 
 ### Added
+- **`lwchat mentions`** — threads where people were @mentioned, grouped by IST day (`--user`, `--spaces`, `--allowed-only`, `--date`/`--from`/`--to`, `--json`). `--user` uses server-side search across every space you're in (7 days: 34.8s → 4.6s, 24 → 28 mentions; the 3 missed were Redmine Notifier bot posts); without `--user` it scans `redmine_spaces` (search has no reliable "any mention" filter). `--json` reports `method`.
 - **Space catalog + allowed list** (ADR-017). `lwchat spaces sync` catalogs every
   space, DM and group chat you're in (`cache/spaces.json`, auto-refreshed daily).
   `lwchat spaces allow|disallow <alias|id|name>` edit the allowed list

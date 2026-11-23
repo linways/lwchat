@@ -19,6 +19,7 @@ import {
   cmdRead,
   cmdDigest,
   cmdInbox,
+  cmdMentions,
   cmdStandup,
   cmdStandupTeam,
   cmdStandupCron,
@@ -68,6 +69,7 @@ COMMANDS:
                       Read an issue/thread/space/DM/person with one uniform JSON shape; attachments are always listed
     digest  <issue_id> [--space <a>] [--scan] Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
+    mentions [--user <who>] [--spaces a,b] [--allowed-only] [--date D | --from D [--to D]]  Threads where someone was @mentioned, by IST day (--user: server-side search)
     standup [--user <name|email|id>] [--hours N] [--space <a>] [--card [--webhook <alias|url>]] [--team]
                                         Standup buckets (last 24h, default = you; --user targets a teammate; --team runs every standup_team member); --card posts a clickable card to a Chat webhook
     standup team list|add <who>|remove <who>
@@ -172,6 +174,9 @@ async function main() {
   const daysFlag = popFlag("--days"); // recency window — for `inbox`
   const hoursFlag = popFlag("--hours"); // recency window in hours — for `standup`
   const userFlag = popFlag("--user");   // standup: target user (name/email/id)
+  const dateFlag = popFlag("--date");
+  const fromFlag = popFlag("--from");
+  const toFlag = popFlag("--to");
   const atFlag = popFlag("--at");        // standup cron: time HH:MM
   const webhookFlag = popFlag("--webhook"); // alias or url — for `standup --card`
   const attachFlag = popFlag("--attach"); // local file path — for `post` / `reply` / `dm`
@@ -189,6 +194,14 @@ async function main() {
     if (json) console.log(JSON.stringify({ ok: false, error: msg }));
     else console.error(`error: ${msg}`);
     process.exit(1);
+  }
+  for (const [flag, val] of [["--date", dateFlag], ["--from", fromFlag], ["--to", toFlag]]) {
+    if (val === undefined && args.includes(flag)) {
+      const msg = `${flag} needs a value (YYYY-MM-DD). Got nothing after ${flag}.`;
+      if (json) console.log(JSON.stringify({ ok: false, error: msg }));
+      else console.error(`error: ${msg}`);
+      process.exit(1);
+    }
   }
   if (readRequested && outFlag === undefined && args.includes("--out")) {
     const msg = "--out needs a value (local directory path). Got nothing after --out.";
@@ -293,6 +306,12 @@ async function main() {
       case "inbox": {
         const days = daysFlag ? parseInt(daysFlag, 10) : 14;
         await cmdInbox({ days, spaceAlias: spaceFlag, allowedOnly }, json);
+        break;
+      }
+
+      case "mentions": {
+        const spaceAliases = spacesFlag ? spacesFlag.split(",").map((s) => s.trim()).filter(Boolean) : spaceFlag ? [spaceFlag] : null;
+        await cmdMentions({ userArg: userFlag, spaceAliases, date: dateFlag, from: fromFlag, to: toFlag, allowedOnly }, json);
         break;
       }
 
