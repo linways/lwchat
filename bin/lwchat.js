@@ -13,6 +13,8 @@ import {
   cmdSpacesAdd,
   cmdSpacesRemove,
   cmdSpacesFetch,
+  cmdSpacesSync,
+  cmdSpacesAllowance,
   cmdFind,
   cmdRead,
   cmdDigest,
@@ -51,15 +53,20 @@ COMMANDS:
 
     me [--refresh]                      Show your identity + spaces (writes me.md)
 
-    spaces                              List configured spaces
+    spaces                              List the space catalog with allowed flags (allowed = default_spaces)
+    spaces sync                         Re-sync the catalog of every space you're in (auto-refreshed daily)
+    spaces allow <alias|id|name>        Allow a space (scan + post); logged to ~/.lwchat/space-changes.ndjson
+    spaces disallow <alias|id|name>     Disallow a space (stays searchable via the catalog)
     spaces fetch                        Fetch all spaces from Google Chat
-    spaces add <alias> <space_id>       Add a space
+    spaces add <alias> <space_id>       Add + allow a space
     spaces remove <alias>               Remove a space
 
-    find    <issue_id>                  Find the issue's thread(s) — reports every space it's in
-    read    <target> [--as kind] [--limit N] [--analyze|--download] [--out <dir>]
+    find    <issue_id> [--allowed-only] [--scan]
+                                        Find the issue's thread(s) via Chat search (each location has allowed: true|false).
+                                        complete:false = search only; --scan also scans allowed Redmine spaces (slow) for bot-started threads
+    read    <target> [--as kind] [--scan] [--limit N] [--analyze|--download] [--out <dir>]
                       Read an issue/thread/space/DM/person with one uniform JSON shape; attachments are always listed
-    digest  <issue_id> [--space <a>]    Merged brief: Redmine status + chat participants/activity + timeline
+    digest  <issue_id> [--space <a>] [--scan] Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
     standup [--user <name|email|id>] [--hours N] [--space <a>] [--card [--webhook <alias|url>]] [--team]
                                         Standup buckets (last 24h, default = you; --user targets a teammate; --team runs every standup_team member); --card posts a clickable card to a Chat webhook
@@ -67,7 +74,7 @@ COMMANDS:
                                         Manage standup_team (the members --team / the scheduled run cover)
     standup cron install [--at HH:MM] [--days mon-sat] | status | remove
                                         Schedule the Mon–Sat 10:00 auto-post (standup --team --card); logs to ~/.lwchat/cron/standup.log
-    reply   <issue_id> <message> [--space <a>] [--attach <local-path>]
+    reply   <issue_id> <message> [--space <a>] [--scan] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
     post    <space> <message> [--thread <name>] [--attach <local-path>]
@@ -76,8 +83,8 @@ COMMANDS:
                                         DM a user (email/name/users/id); auto-creates DM if needed; --attach uploads + attaches a local file
     directory <query> [--refresh]       Search the org directory (cached 24h)
     warm                                Pre-fetch all configured spaces' members + names (cache hot)
-    search  <term> [--space <a> | --spaces a,b,c] [--limit N] [--case-sensitive]
-                                        Search messages across configured spaces (client-side scan)
+    search  <term> [--space <a> | --spaces a,b,c] [--allowed-only] [--limit N] [--case-sensitive]
+                                        Search messages (Chat server-side search over the space catalog; scan fallback on allowed spaces). Each hit has allowed: true|false
 
     threads [--space <alias>]           List recent threads
     by      <user> [--space <a>] [--include-replies] [--limit N]
@@ -131,12 +138,14 @@ async function main() {
   // Value-flags like --space / --client-id are NOT global; their command
   // handlers consume them positionally, so they stay in cleanArgs.
   const readRequested = args[0] === "read";
-  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep", "--card", "--team"]);
+  const GLOBAL_FLAGS = new Set(["--json", "--verbose", "--case-sensitive", "--include-replies", "--deep", "--card", "--team", "--allowed-only", "--scan"]);
   const COMMAND_FLAGS = new Set([
     ...(readRequested ? ["--force", "--analyze", "--download"] : []),
   ]);
   const json = args.includes("--json");
   const caseSensitive = args.includes("--case-sensitive");
+  const allowedOnly = args.includes("--allowed-only");
+  const scan = args.includes("--scan"); // find/read/digest/reply: also scan allowed Redmine spaces
   const includeReplies = args.includes("--include-replies");
   const deep = args.includes("--deep");
   const card = args.includes("--card");
@@ -236,6 +245,15 @@ async function main() {
           await cmdSpacesRemove(alias, json);
         } else if (sub === "fetch") {
           await cmdSpacesFetch(json);
+        } else if (sub === "sync") {
+          await cmdSpacesSync(json);
+        } else if (sub === "allow" || sub === "disallow") {
+          const query = cleanArgs.slice(2).join(" ");
+          if (!query) {
+            console.error(`Usage: lwchat spaces ${sub} <alias|spaces/id|name-substring>`);
+            process.exit(1);
+          }
+          await cmdSpacesAllowance(query, sub, json);
         } else {
           await cmdSpaces(json);
         }
@@ -247,7 +265,7 @@ async function main() {
           console.error("Usage: lwchat find <issue_id>");
           process.exit(1);
         }
-        await cmdFind(issueId, json);
+        await cmdFind(issueId, json, { allowedOnly, scan });
         break;
       }
 
@@ -258,7 +276,7 @@ async function main() {
           process.exit(1);
         }
         const limit = limitFlag ? parseInt(limitFlag, 10) : 30;
-        await cmdRead(target, { spaceAlias: spaceFlag, asHint: asFlag, limit, analyze, download, outDir: outFlag, force: readForce }, json);
+        await cmdRead(target, { spaceAlias: spaceFlag, asHint: asFlag, limit, analyze, download, outDir: outFlag, force: readForce, scan }, json);
         break;
       }
 
@@ -268,13 +286,13 @@ async function main() {
           console.error("Usage: lwchat digest <issue_id> [--space <alias>]");
           process.exit(1);
         }
-        await cmdDigest(issueId, spaceFlag, json);
+        await cmdDigest(issueId, spaceFlag, json, { scan });
         break;
       }
 
       case "inbox": {
         const days = daysFlag ? parseInt(daysFlag, 10) : 14;
-        await cmdInbox({ days, spaceAlias: spaceFlag }, json);
+        await cmdInbox({ days, spaceAlias: spaceFlag, allowedOnly }, json);
         break;
       }
 
@@ -283,7 +301,7 @@ async function main() {
         if (subc === "team") { await cmdStandupTeam(cleanArgs[2], cleanArgs[3], json); break; }
         if (subc === "cron") { await cmdStandupCron(cleanArgs[2], { at: atFlag, days: daysFlag }, json); break; }
         const hours = hoursFlag ? parseInt(hoursFlag, 10) : 24;
-        await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag, user: userFlag, team }, json);
+        await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag, user: userFlag, team, allowedOnly }, json);
         break;
       }
 
@@ -294,7 +312,7 @@ async function main() {
           process.exit(1);
         }
         const limit = limitFlag ? parseInt(limitFlag, 10) : 10;
-        await cmdBy(user, { spaceAlias: spaceFlag, includeReplies, limit }, json);
+        await cmdBy(user, { spaceAlias: spaceFlag, includeReplies, limit, allowedOnly }, json);
         break;
       }
 
@@ -305,7 +323,7 @@ async function main() {
           console.error('Usage: lwchat reply <issue_id> "message" [--space <alias>] [--attach <local-path>]');
           process.exit(1);
         }
-        await cmdReply(issueId, message, spaceFlag, attachFlag, json);
+        await cmdReply(issueId, message, spaceFlag, attachFlag, json, { scan });
         break;
       }
 
@@ -350,12 +368,12 @@ async function main() {
       case "search": {
         const term = cleanArgs.slice(1).join(" ");
         if (!term) {
-          console.error('Usage: lwchat search <term> [--space <alias> | --spaces a,b,c] [--limit N] [--case-sensitive]');
+          console.error('Usage: lwchat search <term> [--space <alias> | --spaces a,b,c] [--allowed-only] [--limit N] [--case-sensitive]');
           process.exit(1);
         }
         const spaceList = spacesFlag ? spacesFlag.split(",").map((s) => s.trim()).filter(Boolean) : null;
         const limit = limitFlag ? parseInt(limitFlag, 10) : 30;
-        await cmdSearch(term, { spaceAlias: spaceFlag, spaceList, limit, caseSensitive }, json);
+        await cmdSearch(term, { spaceAlias: spaceFlag, spaceList, limit, caseSensitive, allowedOnly }, json);
         break;
       }
 
