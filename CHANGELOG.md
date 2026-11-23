@@ -4,53 +4,62 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
-### Changed
-- **`find` and `search` use Google Chat server-side search** (`spaces.messages.search`)
-  first, with the page-by-page scan kept as fallback for bot/app posts and
-  muted spaces. `find 133321` on a cold cache: not found after 7m11s → found in
-  ~1.6s. Locations record `found_by`; `search --json` reports `method`. (ADR-016)
-- **`find` is search-only by default; new `--scan`** (ADR-018). A result found
-  by search alone is `complete: false` with a `hint`, because search can't see
-  threads a bot (Redmine Notifier) started. `--scan` (also on `read`, `digest`,
-  `reply`) adds the scan of the allowed Redmine spaces and returns
-  `complete: true`; it took 68s to 6m18s cold for #133321 depending on API
-  latency. Zero search hits still fall back to the scan automatically.
-
-- **`inbox`, `standup`, `by` use server-side search; `search` has no scan
-  fallback** (ADR-019). Mentions use `annotations.user_mentions.user.name:<id>`,
-  authors `sender.name = "<id>"`; time windows are applied client-side (the API
-  rejects `createTime` filters). Measured 2026-11-24: `inbox` 62.6s → 6.8s
-  (24 → 27 threads), `standup` 8.7s → 4.7s, `by --limit 20` 39.5s → 1.6s (same
-  20 messages). The only items the old scans found and search misses are
-  mentions in posts by the *Redmine Notifier* bot. Scope is now the space
-  catalog (`--allowed-only`, `--space` as in `search`); `standup` never includes
-  DMs or group chats. `by --json` `space_count` now counts the spaces of the returned items.
-  The page-by-page scan remains only for `find --scan` / `find`'s zero-hit
-  fallback, `index`, `threads` and `read`.
-
-### Added
-- **`lwchat mentions`** — threads where people were @mentioned, grouped by IST day (`--user`, `--spaces`, `--allowed-only`, `--date`/`--from`/`--to`, `--json`). `--user` uses server-side search across every space you're in (7 days: 34.8s → 4.6s, 24 → 28 mentions; the 3 missed were Redmine Notifier bot posts); without `--user` it scans `redmine_spaces` (search has no reliable "any mention" filter). `--json` reports `method`.
-- **Space catalog + allowed list** (ADR-017). `lwchat spaces sync` catalogs every
-  space, DM and group chat you're in (`cache/spaces.json`, auto-refreshed daily).
-  `lwchat spaces allow|disallow <alias|id|name>` edit the allowed list
-  (`default_spaces`) and log each change to `~/.lwchat/space-changes.ndjson`.
-  `lwchat spaces --json` shows the catalog with `allowed` flags.
-- `find` / `search` read the whole catalog through Chat search; every location
-  and hit carries `allowed: true|false`. `--allowed-only` restricts to the
-  allowed list. New config key `search_include_dms` (default `true`).
-
-### Changed
-- `reply` and `post` refuse spaces that aren't allowed, before any API call,
-  with a `spaces allow` hint. `dm` is unchanged.
-- `search` with several `--spaces` scopes server-side with an OR'd
-  `space.name` clause (falls back to client-side filtering past the
-  1000-character filter limit).
-- `search --json` `scope` is `"catalog"` for the default catalog-wide search
-  (was the `default_spaces` array).
-
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
+
+## [0.3.0] — 2026-11-24
+
+### Behaviour and JSON changes (check your scripts)
+- **`search` has no scan fallback** — it uses Google Chat server-side search
+  only; bot / Chat-app posts and muted spaces are never returned, partial words
+  the index can't match return nothing, and a search error fails the command.
+  `method` is always `"chat_search"`.
+- **`search --json` `scope` is the string `"catalog"`** for the default search
+  (was the `default_spaces` array); explicit `--space`/`--spaces` still give an
+  array. Every result and `find` location carries `allowed: true|false`.
+- **`reply` / `post` only write to allowed spaces** (`default_spaces`) and refuse
+  anything else before any API call, with a `lwchat spaces allow <alias>` hint.
+  `dm` is unchanged.
+- **`find` reports `complete`** — `false` (plus a `hint`) when only Chat search
+  ran; `--scan` adds the slow scan for bot-started threads and returns `true`.
+- **Default scope of `find`, `search`, `inbox`, `standup`, `by` is every space you
+  are in** (the space catalog) instead of the configured/learned spaces;
+  `--allowed-only` restores the old scope. `standup` never includes DMs or group
+  chats. `by --json` `space_count` now counts the spaces of the returned items.
+
+### Changed
+- **`find` uses Google Chat server-side search** (`spaces.messages.search`,
+  ADR-016). `find 133321` on a cold cache: not found after 7m11s → found in
+  ~1.6s. Locations record `found_by`. Search-only by default; `--scan` (also on
+  `read`, `digest`, `reply`) adds the scan of the allowed Redmine spaces
+  (68s to 6m18s cold, depending on API latency; ADR-018). Zero search hits
+  still fall back to the scan automatically.
+- **`search`, `inbox`, `standup`, `by` use server-side search** (ADR-019):
+  mention filter `annotations.user_mentions.user.name:<id>`, author filter
+  `sender.name = "<id>"`, time windows applied client-side (the API rejects
+  `createTime` filters). Measured 2026-11-24: `inbox` 62.6s → 6.8s (24 → 27
+  threads), `standup` 8.7s → 4.7s, `by --limit 20` 39.5s → 1.6s. The only items
+  the old scans found and search misses are *Redmine Notifier* bot mentions
+  (accepted; use Redmine / `lwr` for assignment notices).
+- `search` with several `--spaces` scopes server-side with an OR'd `space.name`
+  clause (client-side past the 1000-character filter limit).
+- The page-by-page scan remains only for `find --scan` / `find`'s zero-hit
+  fallback, `index`, `threads`, `read` and `mentions` without `--user`.
+
+### Added
+- **`lwchat mentions`** — threads where people were @mentioned, grouped by IST
+  day (`--user`, `--spaces`, `--allowed-only`, `--date`/`--from`/`--to`,
+  `--json`). `--user` uses server-side search (7 days: 34.8s → 4.6s, 24 → 28
+  mentions); without `--user` it scans `redmine_spaces`, because search has no
+  reliable "any mention" filter. `--json` reports `method`.
+- **Space catalog + allowed list** (ADR-017). `lwchat spaces sync` catalogs every
+  space, DM and group chat you're in (`cache/spaces.json`, auto-refreshed
+  daily). `lwchat spaces allow|disallow <alias|id|name>` edit the allowed list
+  (`default_spaces`) and log each change to `~/.lwchat/space-changes.ndjson`.
+  `lwchat spaces --json` shows the catalog with `allowed` flags. New config key
+  `search_include_dms` (default `true`).
+- `CLAUDE.md` project guide for agents changing the lwchat code.
 
 ## [0.2.0] — 2026-10-14
 
