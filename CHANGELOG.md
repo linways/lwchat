@@ -4,6 +4,12 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+---
+
+## [0.4.0] — 2026-11-24
+
 ### Added
 - **`release-status <issue>` and `release-audit`** (ADR-020). Read the release
   hashtags (`#qa_release`/`#movedToQa`, `#tested`, `#prod_release`/
@@ -20,8 +26,6 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 - Help text: `search` no longer claims a scan fallback; SETUP uses
   `auth login` (bundled client) then `spaces sync` / `spaces allow`;
   `inbox`/`standup`/`by` list `--allowed-only`.
-
-Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 

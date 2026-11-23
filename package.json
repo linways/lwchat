@@ -1,6 +1,6 @@
 {
   "name": "lwchat",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Standalone CLI to read and reply to Google Chat space threads linked to Redmine issues",
   "type": "module",
   "bin": {
