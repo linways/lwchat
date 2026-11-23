@@ -36,6 +36,8 @@ lwchat post myspace "Hi team"               # top-level message to any space
 lwchat dm sibin@linways.com "ping"          # DM by email/name/id
 lwchat find 126235 --scan                   # also scan allowed Redmine spaces for bot-started threads (slow)
 lwchat search "folio bug"                   # Chat server-side search across every space you're in
+lwchat release-status 126235                # #qa_release → #tested → #prod_release timeline + mismatches
+lwchat release-audit                        # issues stuck in QA / tested-not-in-prod / reopened
 lwchat by "Akshay Chandran" --space cicd    # a person's recent posts (top-level by default)
 
 lwchat me     # who am I, which spaces am I in

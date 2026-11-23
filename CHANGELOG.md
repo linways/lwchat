@@ -4,6 +4,23 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+### Added
+- **`release-status <issue>` and `release-audit`** (ADR-020). Read the release
+  hashtags (`#qa_release`/`#movedToQa`, `#tested`, `#prod_release`/
+  `#movedToProduction`, `#reopened`; vocabulary checked against 90 days of real
+  threads) into a state (`in-dev | qa-release | tested | prod-release |
+  reopened`) with a timeline, reopen cycles, Redmine status via `lwr`, git
+  merges into `ams-qa`/`master-v4` for `config.release_repos`, and mismatches.
+  `release-audit` lists issues stuck in QA / tested-not-in-prod / reopened
+  across named spaces (14-day window, 121 issues in 25s), with `--card` and
+  `release-audit cron install|status|remove` on the standup webhook/cron
+  machinery. New recipe `recipes/release.md`.
+
+### Fixed
+- Help text: `search` no longer claims a scan fallback; SETUP uses
+  `auth login` (bundled client) then `spaces sync` / `spaces allow`;
+  `inbox`/`standup`/`by` list `--allowed-only`.
+
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---

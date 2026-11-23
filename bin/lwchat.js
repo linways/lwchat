@@ -23,6 +23,9 @@ import {
   cmdStandup,
   cmdStandupTeam,
   cmdStandupCron,
+  cmdReleaseStatus,
+  cmdReleaseAudit,
+  cmdReleaseAuditCron,
   cmdBy,
   cmdReply,
   cmdPost,
@@ -77,6 +80,12 @@ COMMANDS:
                                         Manage standup_team (the members --team / the scheduled run cover)
     standup cron install [--at HH:MM] [--days mon-sat] | status | remove
                                         Schedule the Mon–Sat 10:00 auto-post (standup --team --card); logs to ~/.lwchat/cron/standup.log
+    release-status <issue_id> [--scan]  Release state from thread hashtags (#qa_release/#tested/#prod_release/#reopened)
+                                        + timeline, Redmine status (lwr) and git merges (config.release_repos); flags mismatches
+    release-audit [--days N] [--stale-days N] [--space a | --spaces a,b] [--allowed-only] [--card [--webhook <alias|url>]]
+                                        Issues stuck in QA / tested-not-in-prod / reopened (default: tags in last 14d, stuck ≥ 2d)
+    release-audit cron install [--at HH:MM] [--days mon-sat] | status | remove
+                                        Schedule the release-audit card (release-audit --card); logs to ~/.lwchat/cron/release-audit.log
     reply   <issue_id> <message> [--space <a>] [--scan] [--attach <local-path>]
                                         Reply; --space required when issue spans spaces; --attach uploads + attaches a local file
 
@@ -170,7 +179,8 @@ async function main() {
   const threadFlag = popFlag("--thread");
   const spacesFlag = popFlag("--spaces"); // comma-separated list
   const limitFlag = popFlag("--limit");
-  const daysFlag = popFlag("--days"); // recency window — for `inbox`
+  const daysFlag = popFlag("--days"); // recency window — for `inbox` / `release-audit`
+  const staleDaysFlag = popFlag("--stale-days"); // release-audit: stuck threshold
   const hoursFlag = popFlag("--hours"); // recency window in hours — for `standup`
   const userFlag = popFlag("--user");   // standup: target user (name/email/id)
   const dateFlag = popFlag("--date");
@@ -320,6 +330,27 @@ async function main() {
         if (subc === "cron") { await cmdStandupCron(cleanArgs[2], { at: atFlag, days: daysFlag }, json); break; }
         const hours = hoursFlag ? parseInt(hoursFlag, 10) : 24;
         await cmdStandup({ hours, spaceAlias: spaceFlag, card, webhook: webhookFlag, user: userFlag, team, allowedOnly }, json);
+        break;
+      }
+
+      case "release-status": {
+        const issueId = cleanArgs[1];
+        if (!issueId) {
+          console.error("Usage: lwchat release-status <issue_id> [--scan] [--json]");
+          process.exit(1);
+        }
+        await cmdReleaseStatus(issueId, json, { scan });
+        break;
+      }
+
+      case "release-audit": {
+        if (cleanArgs[1] === "cron") { await cmdReleaseAuditCron(cleanArgs[2], { at: atFlag, days: daysFlag }, json); break; }
+        const spaceList = spacesFlag ? spacesFlag.split(",").map((s) => s.trim()).filter(Boolean) : (spaceFlag ? [spaceFlag] : null);
+        await cmdReleaseAudit({
+          days: daysFlag ? parseInt(daysFlag, 10) : 14,
+          staleDays: staleDaysFlag ? Number(staleDaysFlag) : 2,
+          spaceList, allowedOnly, card, webhook: webhookFlag,
+        }, json);
         break;
       }
 
