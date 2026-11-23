@@ -547,7 +547,7 @@ After ADR-016/017, `inbox`, `standup` and `by` still paged `messages.list` space
 - **Accepted (user decision, 2026-11-24):** *Redmine Notifier* bot mentions are intentionally not covered by `inbox`/`standup`, and there is no `--include-bots` option; for assignment notices use Redmine (`lwr`) instead.
 - **−** Time windows depend on result ordering; a page cap bounds very large windows.
 - **−** `search` can no longer find partial words the index doesn't match.
-- **Note:** `lwchat mentions` lives on the unmerged `feat/chat-mentions` branch; it can use the same mention filter with `--user <id>` once merged.
+- **`mentions`:** `--user <id>` uses the same mention-filter search (7 days: 34.8s → 4.6s; 24 → 28 groups, the 3 old-only from the Redmine Notifier bot). Without `--user` (everyone's mentions) it **keeps the scan**: the `annotations.user_mentions.user.name:"users/*"` wildcard is accepted but is not "any mention" — over the same 7 days it returned 1,079 groups vs 1,640 from the scan, missing 616 mostly human-written mentions.
 
 ---
 

@@ -69,7 +69,7 @@ COMMANDS:
                       Read an issue/thread/space/DM/person with one uniform JSON shape; attachments are always listed
     digest  <issue_id> [--space <a>] [--scan] Merged brief: Redmine status + chat participants/activity + timeline
     inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
-    mentions [--user <who>] [--spaces a,b] [--date D | --from D [--to D]]  Threads where someone was @mentioned, by IST day
+    mentions [--user <who>] [--spaces a,b] [--allowed-only] [--date D | --from D [--to D]]  Threads where someone was @mentioned, by IST day (--user: server-side search)
     standup [--user <name|email|id>] [--hours N] [--space <a>] [--card [--webhook <alias|url>]] [--team]
                                         Standup buckets (last 24h, default = you; --user targets a teammate; --team runs every standup_team member); --card posts a clickable card to a Chat webhook
     standup team list|add <who>|remove <who>
@@ -311,7 +311,7 @@ async function main() {
 
       case "mentions": {
         const spaceAliases = spacesFlag ? spacesFlag.split(",").map((s) => s.trim()).filter(Boolean) : spaceFlag ? [spaceFlag] : null;
-        await cmdMentions({ userArg: userFlag, spaceAliases, date: dateFlag, from: fromFlag, to: toFlag }, json);
+        await cmdMentions({ userArg: userFlag, spaceAliases, date: dateFlag, from: fromFlag, to: toFlag, allowedOnly }, json);
         break;
       }
 
