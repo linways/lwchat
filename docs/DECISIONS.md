@@ -551,6 +551,35 @@ After ADR-016/017, `inbox`, `standup` and `by` still paged `messages.list` space
 
 ---
 
+## ADR-020: Release status and audit from thread hashtags
+**Date:** 2026-11-24 · **Status:** Accepted
+
+### Context
+
+The team tracks releases with hashtags in issue threads and checks for stuck items by hand in a "Daily #qa_release vs #prod_release Audit" group chat. A read-only sample of 1,743 tagged messages (90 days) showed: developers post `#qa_release`/`#prod_release` (one developer) or `#movedToQa`/`#movedToProduction` (most others, in several casings); QA posts `#tested` (also `#Tested`, `#TESTED`) and `#reopened` (also `#Reopened`, `#re-opened`). `#Test` heads QA "Test Note" messages, and `#verified` is used both for "QA passed" and "bug confirmed". Most `#qa_release`/`#prod_release` occurrences are top-level report messages in two group chats, not release signals. No `#reopen`, `#failed` or `#qa_failed` usage was found.
+
+### Decision
+
+1. Reuse standup's vocabulary (`SIGNAL_TARGETS` / `hasSignal` in `lib/standup.js`); it already covers every variant found. `#Test` and `#verified` are not signals.
+2. `lib/release.js` (pure): events from messages; a state machine where the latest tag wins, a `#qa_release` after `#tested`/`#prod_release` or a `#reopened` counts as a reopen; mismatch rules against Redmine status and git; stuck rules (`awaiting_qa`, `awaiting_prod` after `--stale-days`, `reopened` at any age).
+3. `release-status <issue>`: thread(s) via `find`, Redmine via `lwr`, git via `config.release_repos` (local refs only, `release_branches` default `ams-qa`/`master-v4`; a branch "contains" the issue if a commit on it mentions the id or a branch named after the id is an ancestor).
+4. `release-audit`: server-side search for the tags in `--days` across named spaces (never DMs/group chats, which excludes the report chats), threads mapped to issues via their roots, state computed from the whole thread. `--card` and `cron` reuse the standup card builder (now taking a section order/titles) and a shared `manageCron` helper.
+
+### Reasoning
+
+- Data, not guesses: the existing vocabulary matched every variant in the sample; the two ambiguous tags are excluded rather than mis-read.
+- Counting only threads rooted in a Redmine issue removes the report-chat noise without a sender blocklist.
+- `--days` is the search window and `--stale-days` the stuck threshold, so "stuck for 2 days" can be evaluated inside a 14-day window.
+
+### Consequences
+
+- **+** `release-status 133321` reproduces the hand-checked timeline in ~1.7s; the 14-day audit covers 121 issues in ~25s.
+- **−** Issues whose last tag is older than `--days` are not audited; widen the window.
+- **−** Git answers depend on local refs (no fetch).
+- **−** Tags posted by bots are invisible to the audit (search limitation).
+
+---
+
 ## How to add a new ADR
 
 1. Bump the number (ADR-012, etc.).

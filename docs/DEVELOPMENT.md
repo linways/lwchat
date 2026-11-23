@@ -12,6 +12,7 @@ lib/
   chat-api.js       API client (api() helper) + every Chat/People endpoint + mentions
   chat-search.js    Pure helpers for Chat server-side search (filters, hit → thread candidates, merge)
   space-catalog.js  Pure helpers for the space catalog + allowed list (aliases, resolve, scope, write guard)
+  release.js        Pure release-hashtag parser, state machine, stuck + mismatch rules (release-status / release-audit)
   commands.js       Every command body (one module by design — easy to grep)
   config.js         ~/.lwchat paths, load/save config/tokens/index/members/backups
   me.js             me.md generation + auto-aliasing on first login

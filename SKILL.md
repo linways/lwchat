@@ -20,7 +20,7 @@ This file is the operational contract. For background:
 - **`docs/DECISIONS.md`** — ADRs covering every consequential design choice (multi-space safety, no JS plugins, why a fork instead of a runtime overlay, scope minimalism, naming).
 - **`docs/ROADMAP.md`** — what's done, what's next, the frozen-core + Linways-fork publishing plan, known limits.
 - **`docs/DEVELOPMENT.md`** — how to add a command without breaking conventions.
-- **`recipes/`** — composable patterns (`install-flow`, `gather-context`, `reply-patterns`, `generic-chat`).
+- **`recipes/`** — composable patterns (`install-flow`, `gather-context`, `reply-patterns`, `generic-chat`, `standup`, `release`).
 
 ---
 
@@ -232,6 +232,26 @@ Recognizes both standard tags and teammates' variants (e.g. `#movedToProduction`
 / `#movedToQa`). **Full reference** — all flags, JSON shapes, vocabulary, team &
 cron setup — is in [recipes/standup.md](recipes/standup.md).
 
+### Release status and audit (QA → prod flow)
+
+```bash
+lwchat release-status <issue_id> [--scan] [--json]      # one issue: state + timeline + mismatches
+lwchat release-audit [--days 14] [--stale-days 2] [--json]   # stuck items across spaces
+```
+
+Read the release hashtags in issue threads (`#qa_release`/`#movedToQa`, `#tested`,
+`#prod_release`/`#movedToProduction`, `#reopened`). `release-status` returns
+`state` (`in-dev | qa-release | tested | prod-release | reopened`, latest tag wins),
+the `timeline` (who/when), Redmine status (via `lwr`), git merges into `ams-qa` /
+`master-v4` for repos in `config.release_repos`, and `mismatches` (e.g. prod
+released but Redmine still "In Progress"). `release-audit` lists issues stuck in
+QA, tested but not in prod, or reopened.
+
+**Use them when** the user asks whether an issue is tested / in prod, what's stuck
+in QA, or for release follow-ups — instead of reading threads by hand. Both are
+read-only; `release-audit --card` and `release-audit cron install` post to a
+webhook, so ask first. Full reference: [recipes/release.md](recipes/release.md).
+
 ### Reply to a thread
 
 ```bash
@@ -339,7 +359,7 @@ lwchat search <term> --case-sensitive                   # default is case-insens
 lwchat search <term> --json                             # structured
 ```
 
-Uses Google Chat's server-side search (`spaces.messages.search`) first, so it covers full history, across the **whole space catalog** by default (including DMs and group chats unless `search_include_dms: false`). There is **no scan fallback**: messages posted by bots / Chat apps and messages in muted spaces are never returned (to find a bot-started Redmine thread use `lwchat find <id> --scan`). A search error fails the command. `--json` reports `method: "chat_search"`, and `scope` is `"catalog"` or the list of aliases searched. Every result carries `allowed: true|false`. Returns per match: `space_alias`, `thread`, `sender_name`, `created`, and a snippet. Results are capped by `--limit`; if the cap is hit, the human output says so.
+Uses Google Chat's server-side search (`spaces.messages.search`), so it covers full history, across the **whole space catalog** by default (including DMs and group chats unless `search_include_dms: false`). There is **no scan fallback**: messages posted by bots / Chat apps and messages in muted spaces are never returned (to find a bot-started Redmine thread use `lwchat find <id> --scan`). A search error fails the command. `--json` reports `method: "chat_search"`, and `scope` is `"catalog"` or the list of aliases searched. Every result carries `allowed: true|false`. Returns per match: `space_alias`, `thread`, `sender_name`, `created`, and a snippet. Results are capped by `--limit`; if the cap is hit, the human output says so.
 
 **JSON shape:**
 ```json
@@ -473,8 +493,9 @@ lwchat restore [name]       # latest if no name
 
 `config.json` keys:
 - **spaces**: alias → Google Chat space ID
-- **default_spaces**: the **allowed list** — spaces the scan fallback covers and the only ones `reply`/`post` write to. Change it with `spaces allow|disallow`
+- **default_spaces**: the **allowed list** — spaces `find`'s scan (`--scan` / zero-hit fallback) and `index` cover, and the only ones `reply`/`post` write to. Change it with `spaces allow|disallow`
 - **search_include_dms**: include DMs and group chats in the catalog-wide search scope (default `true`)
+- **release_repos** / **release_branches**: local git checkouts `release-status` checks, and the QA / prod branch names (default `ams-qa` / `master-v4`)
 - **redmine_spaces**: learned subset of `default_spaces` that host Redmine threads; `find` scans these first, with a full fallback. Self-tuning — don't hand-trim it
 - **redmine_url_pattern**: regex to match your Redmine instance's issue URL (the trailing issue id is captured automatically)
 - **cache_ttl_seconds**: thread-location cache freshness window (default 604800 = 7 days; re-scans after this to catch new cross-posts)
