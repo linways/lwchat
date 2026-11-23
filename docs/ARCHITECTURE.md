@@ -45,7 +45,9 @@ The **single source of truth** for runtime state. The cloned repo holds *code*; 
 ├── cache/
 │   ├── thread-index.json    ─ issue_id → { space_alias → location }
 │   ├── thread-roots.json    ─ thread.name → { issue_id|null } (permanent; roots are immutable)
-│   └── members.json         ─ space → { user_id → display_name }
+│   ├── members.json         ─ space → { user_id → display_name }
+│   └── spaces.json          ─ catalog: every space/DM/group chat, with aliases (daily refresh)
+├── space-changes.ndjson     ─ append-only log of allowed-list changes (outside cache/)
 ├── backups/                 ─ timestamped snapshots
 │   └── 2026-05-29T10-17-01_pre-project-switch/
 │       ├── config.json
@@ -70,7 +72,7 @@ Every path is a constant in `lib/config.js`. New runtime files belong in this tr
     "exam-controller": "spaces/AAAAdOaHhRY",
     "myspace":          "spaces/AAAAI_WLIUo"
   },
-  "default_spaces": [                          // full scan scope for find/index/search
+  "default_spaces": [                          // ALLOWED LIST: scan scope + the only reply/post targets (§3a)
     "exam-controller", "academics", "dev-analysis"
   ],
   "redmine_spaces": [                          // learned subset that host issues (see §3)
@@ -78,7 +80,8 @@ Every path is a constant in `lib/config.js`. New runtime files belong in this tr
   ],
   "redmine_url_pattern": "redmine\\.linways\\.com/issues/",  // a REGEX (escaped dots)
   "cache_ttl_seconds": 604800,                 // thread-location cache freshness (7d)
-  "page_limit": 20                             // max pages scanned per space (100 msgs/pg)
+  "page_limit": 20,                            // max pages scanned per space (100 msgs/pg)
+  "search_include_dms": true                   // catalog-wide search includes DMs + group chats
 }
 ```
 
@@ -115,7 +118,7 @@ Default values live in `DEFAULT_CONFIG` (`lib/config.js`). Missing keys fall bac
 
 ```
 cached entry exists?
-  ├─ no   → live scan; cache the result; return
+  ├─ no   → live lookup (search, then scan fallback); cache the result; return
   └─ yes  → newest indexed_at within cache_ttl_seconds?
               ├─ yes → return cached (no network, instant)
               └─ no  → live re-scan to refresh and catch newly-cross-posted spaces
@@ -126,11 +129,29 @@ cached entry exists?
 
 The TTL exists to **catch a thread newly posted to another space**, not to invalidate location data. Stale cache is always a safe fallback — Chat thread IDs do not change once created. (Default TTL is 7 days: locations are stable, so a short window only discards the instant cache hit.)
 
-**Scoped, self-learning live scan (`scanLocations`).** A live scan doesn't sweep all of `default_spaces` blindly. It scans `config.redmine_spaces` first — the learned subset of spaces that actually host Redmine threads (in practice ~15 of 31; the top 5 hold ~95%) — **concurrently** (bounded fan-out). On a scoped *miss* it falls back to a full `default_spaces` scan, so a brand-new issue is never lost; every space an issue is found in is then merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space discovery is preserved — the scan collects **every** match, never short-circuits across spaces.
+**Server-side search first (`searchLocations`).** A live lookup starts with one indexed `spaces.messages.search` call (`POST spaces/-/messages:search`, filter = the quoted issue id, ≤3 pages). Hits outside the configured scope are dropped; a hit that is the thread root is checked directly, a reply has its root resolved via `thread-roots.json`. Every matching space is kept. This reaches dormant threads of any age in ~1–2 s with no `index --deep`. Search never returns bot/Chat-app posts, Chat-app DMs, blocked users or muted spaces, so when it finds nothing (or errors) `findLocations` falls back to the scan below. When it does find something, the default skips the scan (`scanPlan` in `lib/chat-search.js`) and marks the locations `scan_ran: false`; `find` then reports `complete: false` plus a hint. `--scan` adds the scoped `redmine_spaces` scan and merges (search wins on overlap; scan-only spaces get `found_by: "scan"`), `complete: true`. `--scan` also bypasses a fresh cache. Each location records `found_by: "chat_search" | "scan"`. See [ADR-018](DECISIONS.md#adr-018-find-is-search-only-by-default---scan-opts-into-the-slow-complete-lookup). See [ADR-016](DECISIONS.md#adr-016-server-side-chat-search-first-scan-as-fallback).
+
+**Scoped, self-learning live scan (`scanLocations`) — the fallback.** A live scan doesn't sweep all of `default_spaces` blindly. It scans `config.redmine_spaces` first — the learned subset of spaces that actually host Redmine threads (in practice ~15 of 31; the top 5 hold ~95%) — **concurrently** (bounded fan-out). On a scoped *miss* it falls back to a full `default_spaces` scan, so a brand-new issue is never lost; every space an issue is found in is then merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space discovery is preserved — the scan collects **every** match, never short-circuits across spaces.
 
 **Old-root resolution (`cache/thread-roots.json`).** The issue↔thread link lives only in a thread's *root* (the URL-bearing starter), but the scan window is recency-bounded — so a long-lived EPIC whose root predates the window was historically undiscoverable even while active today (`find` missed it; the "active thread, old root" blind spot). The scan now also collects every distinct `thread.name` in the window (replies included) and resolves each thread's root via `getThreadRoot`, decoupling *"thread is active"* (a reply in-window) from *"root is in-window."* Roots are immutable, so results — including `null` for non-issue threads — are cached **permanently** in `thread-roots.json`; a root is fetched at most once ever, so the cost amortizes to ~zero. `index --deep` reads far more pages per space for a one-time historical backfill. Residual gap: a *fully dormant* thread (no reply in the window) still needs `--deep`; `find` says so in its not-found `hint`.
 
 `lwchat cache show` / `lwchat cache clear` expose the cache to users.
+
+## 3a. Space catalog and allowed list
+
+Two sets of spaces, kept apart on purpose ([ADR-017](DECISIONS.md#adr-017-space-catalog-for-reads-allowed-list-for-scans-and-writes)):
+
+| | Catalog (`cache/spaces.json`) | Allowed list (`default_spaces`) |
+|---|---|---|
+| What | every space, DM and group chat the user is in (`spaces.list`, all types, paged) | the user-chosen subset |
+| Refreshed | `spaces sync`, or automatically by find/search when older than 24h (best effort) | only by `spaces allow/disallow/add/remove` |
+| Server-side search (`find`, `search`, `inbox`, `standup`, `by`) | yes (DMs/group chats unless `search_include_dms: false`) | yes; `--allowed-only` limits to this |
+| Scan (`find --scan` / zero-hit fallback, `index`) | no | yes |
+| `reply` / `post` | refused | yes |
+
+Aliases (`buildCatalog` in `lib/space-catalog.js`): a config alias for the id wins, then the alias the previous catalog gave it (stable across syncs), then a slug of `displayName`, suffixed `-2`, `-3`… on collision. Unnamed DMs get `dm-<id>`, unnamed group chats `group-<id>` — the id is stable and listing every DM's members just to name it would cost a call per DM.
+
+Results carry `allowed: true|false`, computed at output time from `default_spaces` (never stored), so a later `allow` is reflected immediately. The write guard (`writeGuard`) runs before any API call in `post` and before the send path in `reply`; a refusal returns a `hint` naming the `spaces allow` command. Nothing is ever allowed implicitly; every allowed-list change appends a line to `space-changes.ndjson`.
 
 ## 4. Multi-space safety
 
@@ -140,7 +161,7 @@ Because the same issue can be cross-posted to multiple spaces (a real situation 
 |---|---|
 | `find` | reports **every** space, prints them all |
 | `read` | reads **all matching threads** by default; `--space <alias>` narrows to one |
-| `reply` | with 1 location → posts; with **>1 and no `--space`** → **refuses** with a clear error listing the available spaces (so a reply never lands in the wrong thread) |
+| `reply` | only allowed locations are candidates; with 1 → posts; with **>1 and no `--space`** → **refuses** listing them; with 0 (issue only in non-allowed spaces) → refuses with a `spaces allow` hint |
 | `index` | accumulates per-(issue, space) entries; never overwrites a sibling location |
 
 The reply safety check happens *before* any `sendMessage` API call. There is no "we'll pick one for you" branch — that would be a footgun.
@@ -208,18 +229,21 @@ All posting commands resolve `@mentions` via the aggregated member map and pass 
 
 ## 8. Search
 
-`search` is a bounded **client-side scan** — Google Chat's `messages.list` filter parameter only supports `create_time` and `thread.name`, not message content. So:
+Every content lookup uses Chat's server-side **`spaces.messages.search`** (`POST spaces/-/messages:search`). The page-by-page `messages.list` scan survives only where search can't do the job: `find --scan` and `find`'s zero-hit fallback (bot-started threads), `index` / `index --deep` (cache backfill), `threads` (one page of recent threads per space) and `read` (a known thread or space). See [ADR-019](DECISIONS.md#adr-019-search-only-for-search-inbox-standup-and-by-scan-kept-for-the-botmuted-gap).
 
-```
-for each chosen space:
-  paginate ≤ page_limit pages of 100 msgs each (newest-first):
-    for each msg:
-      if matches(needle, msg.text):
-        record { space, thread, sender, sender_name, created, snippet }
-        stop when count == limit
-```
+| Command | Filter (built in `lib/chat-search.js`) | Then |
+|---|---|---|
+| `search <term>` | `"<term>"` (quoted phrase) | substring re-check (keeps `--case-sensitive`), ≤5 pages |
+| `find <id>` | `"<id>"` | root check per thread (§3) |
+| `inbox` | `annotations.user_mentions.user.name:<me>` | window filter, then `listThreadMessages` per thread for `awaiting_reply` |
+| `standup` | `sender.name = "<user>"` **and separately** the mention filter (no cross-field OR) | union of threads, window filter, unchanged bucket classification |
+| `by <user>` | `sender.name = "<user>"` | stop at `--limit` items of the requested kind |
 
-Honest about coverage: the human output explicitly says "(limit reached — use --limit to expand)" when it caps, so a user/agent doesn't mistake the cap for "no more matches." Scopes are user-controlled via `--space`, `--spaces a,b,c`, or default to `default_spaces`.
+Scope (`commandScope`): `--space`, else the catalog, or the allowed list with `--allowed-only` (§3a). `withSpaceScope` adds `AND (space.name = … OR …)`; past the API's 1000-character limit (e.g. the 160-space catalog) the clause is dropped and out-of-scope hits are filtered client-side. `standup` always excludes DMs and group chats.
+
+**Time windows are client-side.** The API rejects every `createTime` clause, including the documented examples (tested 2026-11-24). Results come newest-first with neighbours occasionally swapped by seconds, so `searchInScope` drops hits older than the cutoff and stops after a page lying wholly more than an hour before it (`pageBeyondWindow`), at most 20 pages (warning on stderr when the cap cuts results).
+
+**Blind spots (accepted):** search never returns messages posted by Chat apps / bots (e.g. *Redmine Notifier* mentions), Chat-app DMs, blocked users, or muted spaces, and only covers spaces the user is in. `search` has no fallback; a search error fails the command. Honest about coverage: the human output says "(limit reached — use --limit to expand)" when it caps.
 
 ## 9. Authentication
 

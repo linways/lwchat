@@ -29,7 +29,7 @@ This file is the operational contract. For background:
 Before answering anything about chat discussions, threads, or spaces, **read `~/.lwchat/me.md`**. It tells you:
 
 - The authenticated user's identity (name, email, Chat user ID).
-- The **configured spaces** (alias → space ID) that `find`/`read`/`reply` search by default.
+- The **configured spaces** (alias → space ID). The allowed list (`default_spaces`) is where `reply`/`post` may write; `find`/`search` read every space you're in (see *Spaces: catalog and allowed list*).
 - The **full list of spaces** the user belongs to, with member counts and last-active dates — the closed set to match against when the user names a space loosely ("the exam controller space").
 
 If `~/.lwchat/me.md` doesn't exist, the user isn't set up yet. Run `lwchat me --refresh` (requires auth) to generate it, or see Setup below.
@@ -83,10 +83,12 @@ lwchat me --refresh    # re-fetch identity + spaces, rewrite me.md
 ### Find the chat thread(s) for an issue
 
 ```bash
-lwchat find <issue_id> [--json]
+lwchat find <issue_id> [--allowed-only] [--scan] [--json]
 ```
 
-Reports **every** space the issue's thread appears in (the same issue is often cross-posted to multiple spaces). `--json` returns `{ ok, issue_id, count, locations: [{ space_alias, thread, ... }] }`. Locations are cached in `~/.lwchat/cache/thread-index.json`.
+Reports every space Chat search finds the issue's thread in (the same issue is often cross-posted to multiple spaces). `--json` returns `{ ok, issue_id, count, complete, hint?, locations: [{ space_alias, thread, found_by, allowed, ... }] }`.
+
+**`complete` and `--scan`.** By default `find` uses Chat search only (~2s). Search never sees threads started by a bot (e.g. *Redmine Notifier*), so when search found something and no scan ran, the result is `complete: false` with a `hint` — a bot-started thread in another space (with no human reply mentioning the issue id) may be missing. Re-run with `--scan` to also scan the allowed Redmine spaces and merge (`complete: true`; slow — about 1 to 6 minutes depending on Chat API latency). When search finds nothing, the scan runs automatically and the result is `complete: true`. Use `--scan` only when you must be sure no space is missed (e.g. before a multi-space reply decision); for reading context the default is enough. `read`, `digest` and `reply` accept `--scan` too. Search covers the whole space catalog, so a location can be in a space that is **not allowed** (`allowed: false`): you can read it, but `reply` will not post there. `--allowed-only` restricts the lookup to allowed spaces. Locations are cached in `~/.lwchat/cache/thread-index.json`.
 
 ### Read any Chat target
 
@@ -161,13 +163,16 @@ participants, first_activity, last_activity, messages }] }`. Read-only.
 ### Inbox — mentions awaiting your reply
 
 ```bash
-lwchat inbox [--days N] [--space <alias>] [--json]
+lwchat inbox [--days N] [--space <alias>] [--allowed-only] [--json]
 ```
 
-Morning triage: messages that **@mention you** across the spaces that host
-Redmine threads (the learned `redmine_spaces`), within the last `--days` window
-(default 14). Mentions are detected from message annotations (robust — message
-text only shows `@DisplayName`). Grouped by thread, each flagged
+Morning triage: messages that **@mention you** in every space you're in (the
+space catalog; `--allowed-only` = allowed list, `--space` = one space), within
+the last `--days` window (default 14). Found with one Google Chat server-side
+search on the mention annotation, so it takes seconds. Search can't see
+mentions inside messages posted by **bots / Chat apps** or in muted spaces.
+*Redmine Notifier* bot mentions are intentionally not covered by `inbox`/`standup`;
+for assignment notices use Redmine (`lwr`) instead. Grouped by thread, each flagged
 `awaiting_reply` (true when you haven't posted after the latest mention),
 enriched with the issue id (from the index) and Redmine status. Sorted
 awaiting-first. JSON shape: `{ ok, me, window_days, count, awaiting_count,
@@ -185,6 +190,10 @@ lwchat standup cron install|status|remove           # Mon–Sat 10:00 auto-post
 
 Buckets a user's recent threads (default **24h**) — prod/qa/reopened/assigned/
 working — by the team's chat conventions, and can post a clickable Chat card.
+Candidate threads come from two server-side searches (messages the user sent,
+messages that @mention them) across named spaces in the catalog — **never DMs or
+group chats**, since a card goes to a shared webhook. `--allowed-only` /
+`--space` narrow it. Bot-posted mentions are not seen (search limitation).
 
 > **DEFAULT ACTION:** when the user asks for "my standup" / "daily summary" / "post
 > standups for X, Y, Z", **post the card** — do not hand-assemble plain text.
@@ -208,7 +217,9 @@ Posts a threaded reply. **@mentions are auto-resolved** — write `@Krishnakumar
 
 `--attach` (optional): attach a local file (screenshot, repro, PDF, etc.). lwchat uploads the file to the same space as the thread and attaches it to the reply. Same constraints as `post --attach` — local paths only, not URLs. See the `post` section below for the why.
 
-**Multi-space safety:** if the issue exists in more than one space, `reply` **refuses to post** without `--space <alias>` (so a message never lands in the wrong space). `find` first to see the options.
+**Multi-space safety:** if the issue exists in more than one allowed space, `reply` **refuses to post** without `--space <alias>` (so a message never lands in the wrong space). `find` first to see the options.
+
+**Allowed spaces only:** `reply` and `post` only write to allowed spaces (`default_spaces`). A non-allowed target fails before any API call with `{ ok: false, error, hint, not_allowed: [...] }`. See *Spaces: catalog and allowed list* below before running `spaces allow`.
 
 **Thread opt-out (#stoplwchat):** Every threaded message lwchat sends carries
 an auto-generated footer telling people they can mute lwchat by replying with
@@ -294,7 +305,8 @@ Both `members.json` and the `directory_cache` carry a 7-day TTL — member lists
 ### Search messages
 
 ```bash
-lwchat search <term>                                    # scan default_spaces
+lwchat search <term>                                    # whole space catalog (server-side search)
+lwchat search <term> --allowed-only                     # allowed spaces only
 lwchat search <term> --space exam-controller            # one space
 lwchat search <term> --spaces exam-controller,cicd      # comma-separated subset
 lwchat search <term> --limit 50                         # default 30
@@ -302,14 +314,14 @@ lwchat search <term> --case-sensitive                   # default is case-insens
 lwchat search <term> --json                             # structured
 ```
 
-Google Chat has **no server-side full-text search**, so this is a bounded client-side scan (the same pagination `find`/`index` use, capped by `page_limit`). Returns per match: `space_alias`, `thread`, `sender_name`, `created`, and a snippet. Results are capped by `--limit`; if the cap is hit, the human output says so.
+Uses Google Chat's server-side search (`spaces.messages.search`) first, so it covers full history, across the **whole space catalog** by default (including DMs and group chats unless `search_include_dms: false`). There is **no scan fallback**: messages posted by bots / Chat apps and messages in muted spaces are never returned (to find a bot-started Redmine thread use `lwchat find <id> --scan`). A search error fails the command. `--json` reports `method: "chat_search"`, and `scope` is `"catalog"` or the list of aliases searched. Every result carries `allowed: true|false`. Returns per match: `space_alias`, `thread`, `sender_name`, `created`, and a snippet. Results are capped by `--limit`; if the cap is hit, the human output says so.
 
 **JSON shape:**
 ```json
-{ "ok": true, "term": "...", "scope": ["exam-controller"], "count": 3, "limit": 30,
+{ "ok": true, "term": "...", "scope": "catalog", "method": "chat_search", "count": 3, "limit": 30,
   "results": [{ "space_alias": "exam-controller", "thread": "spaces/.../threads/...",
                  "sender_name": "Lakshmi Nandakumar", "created": "2026-05-23T08:01:24.128703Z",
-                 "snippet": "...", "is_reply": false }] }
+                 "snippet": "...", "is_reply": false, "allowed": true }] }
 ```
 
 Combine with `post --thread` to take action on a thread you found via `search`:
@@ -328,9 +340,9 @@ lwchat cache clear    # drop the thread location cache
 
 The cache stores only **thread locations** (stable IDs), never messages. Within `cache_ttl_seconds` (default 7 days — locations are stable) `find`/`read`/`reply` use it instantly; past the TTL they re-scan to catch an issue newly posted to another space, falling back to the cached location if the scan fails.
 
-**Scoped, self-learning scan.** When a re-scan is needed, `find` doesn't blindly sweep all 31 spaces. It scans `config.redmine_spaces` first — the set of spaces it has *learned* host Redmine threads (only ~15 of 31 do; the top 5 hold ~95%). On a miss it falls back to a full `default_spaces` scan, and any space an issue is found in is merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space issues are still fully discovered (it collects every match, never stops at the first). Run `lwchat index` once to populate both the location cache and `redmine_spaces` for instant lookups.
+**Scoped, self-learning scan.** When the scan runs, `find` doesn't blindly sweep every allowed space. It scans `config.redmine_spaces` first — the set of spaces it has *learned* host Redmine threads (usually a small subset of the allowed list). On a miss it falls back to a full `default_spaces` scan, and any space an issue is found in is merged back into `redmine_spaces`. `index` seeds the set from full discovery. Multi-space issues are still fully discovered (it collects every match, never stops at the first). Run `lwchat index` once to populate both the location cache and `redmine_spaces` for instant lookups.
 
-**Old-root resolution (active thread, ancient root).** A thread's issue link lives only in its *root* (the URL-bearing starter), but a long-lived EPIC's root can be far older than the scan window while the thread is active today. So the scan also collects every thread that appears in the window (replies included) and resolves each thread's root via a **permanent root cache** (`cache/thread-roots.json` — roots are immutable, so each is fetched at most once ever). This means an active thread is found by its recent reply even when its root predates the window. First scan of a busy space pays the resolution cost once; after that it's cached. `lwchat index --deep` does a one-time historical backfill (reads far more pages per space). If `find` still returns nothing, the JSON carries a `hint` — a fully dormant thread whose root predates the window needs `index --deep`.
+**Old-root resolution (active thread, ancient root).** A thread's issue link lives only in its *root* (the URL-bearing starter), but a long-lived EPIC's root can be far older than the scan window while the thread is active today. So the scan also collects every thread that appears in the window (replies included) and resolves each thread's root via a **permanent root cache** (`cache/thread-roots.json` — roots are immutable, so each is fetched at most once ever). This means an active thread is found by its recent reply even when its root predates the window. First scan of a busy space pays the resolution cost once; after that it's cached. `lwchat index --deep` does a one-time historical backfill (reads far more pages per space). `find` now tries Chat's server-side search first (one call, any age; each location records `found_by: "chat_search" | "scan"`), so this scan is only the fallback for what search can't see: bot/Chat-app posts and muted spaces. If `find` still returns nothing, the JSON carries a `hint` — a dormant bot-posted thread whose root predates the window needs `index --deep`.
 
 ### List recent threads
 
@@ -355,12 +367,13 @@ and non-Redmine threads. Get a thread name from `threads --json` or
 ### A person's recent posts
 
 ```bash
-lwchat by <user> [--space <alias>] [--include-replies] [--limit N] [--json]
+lwchat by <user> [--space <alias>] [--allowed-only] [--include-replies] [--limit N] [--json]
 ```
 
 Lists a person's recent messages, newest first. `<user>` = full name, email, or
-`users/<id>` (resolved via the directory, same as `dm`). By default it scans the
-spaces that person is a member of; `--space` narrows to one.
+`users/<id>` (resolved via the directory, same as `dm`). One server-side search on
+the sender across every space you're in (`--allowed-only` / `--space` narrow it);
+only spaces **you** are in are visible.
 
 **Posts vs replies (important — this is a deliberate distinction):**
 - A **post** is a top-level message that *starts* a thread (`is_reply: false`,
@@ -390,14 +403,23 @@ lwchat index [--space <alias>]
 
 Bulk-scans spaces to warm the issue→thread cache.
 
-### Spaces management
+### Spaces: catalog and allowed list
 
 ```bash
-lwchat spaces                      # list configured spaces
-lwchat spaces fetch                # fetch all spaces from Google Chat
-lwchat spaces add <alias> <id>     # configure a space
+lwchat spaces [--json]                         # catalog (every space you're in) with allowed flags
+lwchat spaces sync [--json]                    # re-sync the catalog (auto-refreshed daily by find/search)
+lwchat spaces allow <alias|spaces/id|name> [--json]
+lwchat spaces disallow <alias|spaces/id|name> [--json]
+lwchat spaces add <alias> <id>                 # older form: configure + allow
 lwchat spaces remove <alias>
+lwchat spaces fetch                            # raw list from Google Chat
 ```
+
+- **Catalog** (`cache/spaces.json`): every space, DM and group chat you're in, each with an alias (slug of the name; unnamed DMs are `dm-<id>`, unnamed group chats `group-<id>`).
+- **Allowed list** = `default_spaces`. Allowed spaces are what `find`'s scan (`--scan`, or its zero-hit fallback) covers, and the only spaces `reply`/`post` write to. DMs and group chats are never allowed automatically.
+- **Search everywhere, allow rarely.** `find`/`search` read the whole catalog. A hit with `allowed: false` is fine to read. Run `lwchat spaces allow <alias>` **only** when the task needs to post there, or `find`'s scan must cover that space (e.g. a bot-started thread search can't see). Ask the user first; never allow a space just to make an error go away.
+- `allow`/`disallow` resolve the argument against the catalog; an ambiguous name returns `{ ok: false, error, candidates: [...] }` — pick one alias and retry. `disallow` keeps the catalog entry and the alias.
+- Every change is appended to `~/.lwchat/space-changes.ndjson` (`time, action, alias, id, source`) so the user can see what agents changed.
 
 ### Backup / restore
 
@@ -418,17 +440,20 @@ lwchat restore [name]       # latest if no name
   me.md                    generated identity + spaces snapshot
   cache/thread-index.json  issue_id → { space_alias → {space, thread, indexed_at} }
   cache/members.json       space → {user_id → name}
+  cache/spaces.json        space catalog: every space/DM/group chat you're in, with aliases
+  space-changes.ndjson     append-only log of allow/disallow/add/remove
   backups/                 timestamped backups
   skill/                   canonical SKILL.md + recipes (managed by install.mjs)
 ```
 
 `config.json` keys:
 - **spaces**: alias → Google Chat space ID
-- **default_spaces**: spaces searched when no `--space` is given (full search scope)
+- **default_spaces**: the **allowed list** — spaces the scan fallback covers and the only ones `reply`/`post` write to. Change it with `spaces allow|disallow`
+- **search_include_dms**: include DMs and group chats in the catalog-wide search scope (default `true`)
 - **redmine_spaces**: learned subset of `default_spaces` that host Redmine threads; `find` scans these first, with a full fallback. Self-tuning — don't hand-trim it
 - **redmine_url_pattern**: regex to match your Redmine instance's issue URL (the trailing issue id is captured automatically)
 - **cache_ttl_seconds**: thread-location cache freshness window (default 604800 = 7 days; re-scans after this to catch new cross-posts)
-- **page_limit**: max pages scanned per space (100 messages/page)
+- **page_limit**: max pages per space for the remaining scans (`find --scan` / zero-hit fallback, `index`; 100 messages/page)
 
 ---
 
@@ -449,6 +474,17 @@ lwchat read <id> --json | jq '.messages[] | {who: .sender_name, text}'
 
 ## Error handling
 
-With `--json`, errors return `{"ok": false, "error": "message"}`. Exit code 1 = issue not found in any configured space. If `find` fails for a known issue, the space may be unconfigured or older than the scan window — add the space (`lwchat spaces add`) and/or raise `page_limit`.
+With `--json`, errors return `{"ok": false, "error": "message", ...}` and exit code 1. The ones to know:
+
+| Error | Extra fields | What to do |
+|---|---|---|
+| `Issue #<id> not found in any configured space` | `hint`: "Chat search found nothing (it can't see bot/Chat-app posts or muted spaces) and the recent-activity scan missed it. A dormant thread like that needs `lwchat index --deep` once to backfill historical roots, then retry." | Search already covered every space you're in. If the thread was started by a bot in a space that is not allowed, ask the user before `lwchat spaces allow <alias>` so the scan covers it; otherwise `index --deep` (slow) as the hint says. |
+| `Space '<alias>' is not in the allowed list; lwchat only posts to allowed spaces.` | `hint`: "Run `lwchat spaces allow <alias>` first if this task really needs to post there.", `not_allowed` | Ask the user; never allow a space on your own. |
+| `Issue #<id> is only in spaces that are not on the allowed list (<aliases>). Not posting.` | `hint`, `not_allowed` | Same as above (from `reply`). |
+| `'<query>' matches N spaces` / `No space matches '<query>'` | `candidates: [{alias, id, displayName, spaceType}]` | From `spaces allow/disallow`: pick one alias and retry. |
+
+Not an error, but check it: `find --json` with `complete: false` carries `hint`: "Found by Chat search only. A thread the Redmine Notifier bot started in another space (with no human reply mentioning #<id>) may be missing; run `lwchat find <id> --scan` to also scan the allowed Redmine spaces."
+
+On stderr (not an error; the command continues): `lwchat: Chat search failed (<reason>); falling back to scan` (from `find`), `lwchat: search stopped after N pages; older results not included` (inbox/standup/by hit their page cap), and `lwchat: space catalog refresh failed (<reason>); using cached catalog`. `search` itself fails with `Chat search failed: <reason>`.
 
 See `recipes/gather-context.md` and `recipes/reply-patterns.md` for detailed patterns.

@@ -4,6 +4,49 @@ All notable changes to lwchat. Format inspired by [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+### Changed
+- **`find` and `search` use Google Chat server-side search** (`spaces.messages.search`)
+  first, with the page-by-page scan kept as fallback for bot/app posts and
+  muted spaces. `find 133321` on a cold cache: not found after 7m11s → found in
+  ~1.6s. Locations record `found_by`; `search --json` reports `method`. (ADR-016)
+- **`find` is search-only by default; new `--scan`** (ADR-018). A result found
+  by search alone is `complete: false` with a `hint`, because search can't see
+  threads a bot (Redmine Notifier) started. `--scan` (also on `read`, `digest`,
+  `reply`) adds the scan of the allowed Redmine spaces and returns
+  `complete: true`; it took 68s to 6m18s cold for #133321 depending on API
+  latency. Zero search hits still fall back to the scan automatically.
+
+- **`inbox`, `standup`, `by` use server-side search; `search` has no scan
+  fallback** (ADR-019). Mentions use `annotations.user_mentions.user.name:<id>`,
+  authors `sender.name = "<id>"`; time windows are applied client-side (the API
+  rejects `createTime` filters). Measured 2026-11-24: `inbox` 62.6s → 6.8s
+  (24 → 27 threads), `standup` 8.7s → 4.7s, `by --limit 20` 39.5s → 1.6s (same
+  20 messages). The only items the old scans found and search misses are
+  mentions in posts by the *Redmine Notifier* bot. Scope is now the space
+  catalog (`--allowed-only`, `--space` as in `search`); `standup` never includes
+  DMs or group chats. `by --json` `space_count` now counts the spaces of the returned items.
+  The page-by-page scan remains only for `find --scan` / `find`'s zero-hit
+  fallback, `index`, `threads` and `read`.
+
+### Added
+- **Space catalog + allowed list** (ADR-017). `lwchat spaces sync` catalogs every
+  space, DM and group chat you're in (`cache/spaces.json`, auto-refreshed daily).
+  `lwchat spaces allow|disallow <alias|id|name>` edit the allowed list
+  (`default_spaces`) and log each change to `~/.lwchat/space-changes.ndjson`.
+  `lwchat spaces --json` shows the catalog with `allowed` flags.
+- `find` / `search` read the whole catalog through Chat search; every location
+  and hit carries `allowed: true|false`. `--allowed-only` restricts to the
+  allowed list. New config key `search_include_dms` (default `true`).
+
+### Changed
+- `reply` and `post` refuse spaces that aren't allowed, before any API call,
+  with a `spaces allow` hint. `dm` is unchanged.
+- `search` with several `--spaces` scopes server-side with an OR'd
+  `space.name` clause (falls back to client-side filtering past the
+  1000-character filter limit).
+- `search --json` `scope` is `"catalog"` for the default catalog-wide search
+  (was the `default_spaces` array).
+
 Future work tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---

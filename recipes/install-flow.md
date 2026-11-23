@@ -98,15 +98,16 @@ If any line is `fail`, fix that before declaring victory:
 
 ## Step 5 — Configure spaces (one-time)
 
-After auth, `lwchat` automatically aliases the user's first few spaces. Verify and expand:
+After auth, `lwchat` automatically aliases the user's first few spaces. Then catalog everything and pick the allowed list:
 
 ```bash
-lwchat spaces             # list current aliases
-lwchat spaces fetch       # fetch full list of spaces user is in
-lwchat spaces add <alias> <spaces/AAAAxxxxxxxx>
+lwchat spaces sync                         # catalog every space, DM and group chat the user is in
+lwchat spaces                              # catalog + which spaces are allowed
+lwchat spaces allow <alias|spaces/id|name> # allow a space lwchat may scan and post in
+lwchat spaces add <alias> <spaces/AAAAxxxxxxxx>   # older form: alias + allow in one step
 ```
 
-Ask the user which spaces they want aliased — don't assume names. Common Linways patterns: short single-word aliases (`cicd`, `exam-controller`, `qa`, `release`, `myspace`). Avoid pluralization or hyphens unless the user prefers them.
+`find` and `search` read the whole catalog anyway; the **allowed list** only decides where `reply`/`post` may write and which spaces `find`'s slow scan covers. Ask the user which spaces they want allowed — don't assume names, and never allow DMs or group chats on your own. Common Linways patterns: short single-word aliases (`cicd`, `exam-controller`, `qa`, `release`, `myspace`). Avoid pluralization or hyphens unless the user prefers them.
 
 ## Step 6 — You're done
 

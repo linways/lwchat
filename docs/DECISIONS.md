@@ -420,6 +420,137 @@ gcloud, gh, doppler, supabase, and basically every CLI that talks to a SaaS API 
 
 ---
 
+## ADR-016: Server-side Chat search first; scan as fallback
+**Date:** 2026-11-23 · **Status:** Accepted
+
+### Context
+
+`find` and `search` were built on the belief that Google Chat has no server-side message search, so both paged `spaces.messages.list` newest-first per space. Old dormant threads were unreachable without `index --deep`. Measured on 2026-11-23 for Redmine #133321 with an empty thread cache: `lwchat find` failed after **7m11s**, while the company Claude Google Chat connector found the thread in ~35s through Google's search. The API has `spaces.messages.search` (GA): `POST /v1/spaces/-/messages:search` with a free-text `filter` (plus `createTime`, `sender.name`, `space.name` clauses), `pageSize` ≤ 100. It needs `chat.messages` or `chat.messages.readonly`, which lwchat already requests.
+
+### Decision
+
+1. `searchMessages(filter, {pageSize, pageToken, orderBy})` in `lib/chat-api.js`.
+2. `find` (`resolveLocations` → `findLocations`) runs `searchLocations` first: quoted issue id, ≤3 pages, keep hits in configured spaces, verify the thread root carries the issue URL (root hit parsed directly, reply hits via `getThreadRoot` + `thread-roots.json`), collect every space. Locations record `found_by`.
+3. `search` runs server-side search first, re-applies the substring match, and reports `method: "chat_search" | "scan"` in `--json`.
+4. The page-by-page scan stays as the fallback in both commands when search finds nothing or errors.
+
+### Reasoning
+
+- One indexed call beats tens of paged calls per space, and reaches any age. #133321 now resolves in ~1.6s cold.
+- Search is blind to messages from Chat apps/bots, Chat-app DMs, blocked users and muted spaces. Redmine notifications posted by a bot are a real case, so the scan cannot be removed.
+- Re-checking the substring keeps `search` semantics stable whichever method ran.
+- No new scope, no dependency (ADR-001).
+
+### Consequences
+
+- **+** `find` on a cold cache: 7m11s not-found → ~1.6s found (#133321). `index --deep` is no longer needed for human-posted threads.
+- **+** `search` covers full history instead of the last `page_limit` pages.
+- **−** Fallback triggers only on an *empty* search. If an issue has a human thread in one space and a bot-only thread in another, `find` returns just the human one. Resolved by ADR-018 (`--scan` + `complete` flag).
+- **−** Search POST is not retried on 5xx (only 429), matching the write-safety rule in `fetchWithRetry`; a 5xx simply falls back to the scan.
+- **−** Search hits only spaces in the configured scope (`default_spaces`), so aliases stay usable by `read`/`reply`.
+
+---
+
+## ADR-017: Space catalog for reads; allowed list for scans and writes
+**Date:** 2026-11-24 · **Status:** Accepted
+
+### Context
+
+With server-side search (ADR-016) a read no longer costs one scan per space, so limiting reads to the hand-configured `default_spaces` only hides results. The user is in 160 spaces (64 named spaces, 65 DMs, 31 group chats), while 33 were configured. Writes are different: an agent must never post into a space the user didn't choose.
+
+### Decision
+
+1. **Catalog** — `spaces sync` pages `spaces.list` (all types) into `cache/spaces.json`; find/search refresh it when older than 24h, best effort.
+2. **Allowed list = `default_spaces`** — no new key. `spaces allow|disallow` resolve against the catalog (exact alias/id/name, else a unique substring; ambiguity returns candidates) and edit `default_spaces`, ensuring a `config.spaces` alias exists. `spaces add/remove` keep working.
+3. **Scope rules** — server-side search reads the whole catalog (DMs/group chats per `search_include_dms`, default `true`); `--allowed-only` narrows to the allowed list. The scan fallback and `redmine_spaces` learning stay on allowed spaces. Results carry `allowed: true|false`.
+4. **Writes** — `reply`/`post` refuse non-allowed spaces with a `spaces allow` hint. `dm` to a person is unchanged.
+5. **No silent allow** — only explicit commands change the list; each change appends `{time, action, alias, id, source}` to `~/.lwchat/space-changes.ndjson`.
+
+### Reasoning
+
+- Reads are cheap now; writes are the risk. Separating "can see" from "can post" gives agents full recall without widening where they can speak.
+- Reusing `default_spaces` keeps every existing config, `spaces add`, and the scan cost model unchanged.
+- The change log lives outside `cache/` so `cache clear` never erases the audit trail.
+- Unnamed DMs are aliased `dm-<id>`: naming them by member would cost one `members.list` per DM on every sync.
+
+### Consequences
+
+- **+** `find`/`search` find threads in spaces the user never configured, flagged `allowed: false`.
+- **+** Agents can widen the allowed list at runtime with `--json` commands, and the user can audit it.
+- **−** Catalog-wide `search` can be flooded by a busy non-allowed group chat (e.g. a bot audit chat); use `--allowed-only` or `--spaces`.
+- **−** With all 160 spaces in scope the `space.name` clause exceeds the 1000-char filter limit, so catalog-wide search filters scope client-side.
+- **−** `search --json` `scope` is `"catalog"` (a string) for the default scope, not the alias array.
+- **−** `dm-<id>` aliases are not human-friendly; agents should resolve DMs by person with `dm <user>`.
+
+---
+
+## ADR-018: `find` is search-only by default; `--scan` opts into the slow complete lookup
+**Date:** 2026-11-24 · **Status:** Accepted
+
+### Context
+
+After ADR-016, `find` skipped the scan whenever search found anything. Search never returns threads a bot started, so an issue with a human-started thread in space A and a *Redmine Notifier* thread in space B (with no human reply mentioning the issue id) silently lost B, breaking the old "reports every space" promise. Always running the scoped `redmine_spaces` scan after a search hit restores it, but measured cold for #133321 it took **68–70s** on one run and **6m18s** on another (Chat API page latency ~2s), against **~1.7s** for search alone.
+
+### Decision
+
+The user chose a flag plus a hint over always scanning:
+
+1. Default `find` (and `read`/`digest`/`reply`): search only. If search found ≥1 location and no scan ran, the result is `complete: false` with a `hint` naming `lwchat find <id> --scan`; the human output prints the hint as one line.
+2. `--scan`: search, then the scoped `redmine_spaces` scan (allowed spaces, minus those search covered), merged with `mergeLocations`; `complete: true`. It bypasses a fresh cache.
+3. Zero search hits (or a search error): the full scan fallback runs as before; `complete: true`.
+4. Locations store `scan_ran`; `complete` is computed from them (`isComplete`), so a cached search-only result stays `complete: false` until a scan covers it. Search-only results never drop cached scan-only locations (existing cached-first merge).
+
+### Reasoning
+
+- The bot-only-in-another-space case is rare (no example found among sampled issues; bot threads seen were next to human ones in test spaces), so a 40–200× slowdown on every cold lookup is the wrong default.
+- `complete: false` makes the gap explicit instead of silent, and tells an agent exactly what to run when completeness matters.
+
+### Consequences
+
+- **+** Cold `find` stays ~2s.
+- **+** Callers can tell a possibly-partial answer from a complete one.
+- **−** Agents must read `complete`; one that ignores it can miss a bot-started thread.
+- **−** `--scan` time depends on Chat API latency (1–6+ minutes cold).
+
+---
+
+## ADR-019: Search-only for `search`, `inbox`, `standup` and `by`; scan kept for the bot/muted gap
+**Date:** 2026-11-24 · **Status:** Accepted
+
+### Context
+
+After ADR-016/017, `inbox`, `standup` and `by` still paged `messages.list` space by space, and `search` fell back to that scan on zero hits. Baselines with the old code (2026-11-24): `inbox` (14 days) 62.6s (70.8s in an earlier run), `standup` (24h) 8.7s, `by --limit 20` 39.5s. Probing `spaces.messages.search` (read-only) showed:
+- `annotations.user_mentions.user.name:<users/id>` works for **any** user id, not only `users/me` (so `mentions --user` can use it too).
+- `sender.name = "users/<id>"` works; `sender.name:` does not.
+- Every `createTime` clause is rejected with `400 Invalid filter query`, including the documented examples verbatim.
+- Results come newest-first, with neighbours occasionally swapped by a few seconds (max displacement 1 in 100).
+
+### Decision
+
+1. `inbox`: phase 1 = one search on the mention filter for the user; phase 2 (read each candidate thread for `awaiting_reply`) unchanged.
+2. `standup`: candidates = union of a `sender.name` search and a mention search (no cross-field OR in the API); bucket classification unchanged. DMs and group chats are always excluded, because the card goes to a shared webhook.
+3. `by`: one `sender.name` search, stopping at `--limit` items.
+4. `search`: server-side only; a search error fails the command; `method` stays `"chat_search"`.
+5. Scope everywhere = `search`'s rules (`--space`, else catalog, `--allowed-only`).
+6. Time windows client-side (`searchInScope` + `pageBeyondWindow`: stop after a page wholly an hour older than the cutoff; 20-page cap with a stderr warning).
+7. The page-by-page scan remains only where search cannot answer: `find --scan` and `find`'s zero-hit fallback (bot-started threads), `index`/`index --deep`, `threads`, `read`.
+
+### Reasoning
+
+- Old-vs-new on the same windows: `inbox` 24 vs 27 threads (21 both); the 3 old-only were all posted by the *Redmine Notifier* bot (`users/114022495153014004089`), the 6 new-only were in spaces the old scan never covered (it only scanned the learned `redmine_spaces`). `standup` 3 vs 3 (1 old-only = the same bot post; 1 new-only in a space outside `redmine_spaces`). `by`: identical 20 messages.
+- Nothing missed was a human message, so the scan's cost (minutes, rate limits) buys only bot mentions, which Redmine already records.
+
+### Consequences
+
+- **+** `inbox` ~9× faster, `by` ~25× faster, `standup` ~2× faster, and all cover every space the user is in instead of the learned subset.
+- **−** Mentions in bot / Chat-app posts and anything in muted spaces are invisible to `inbox`, `standup`, `by` and `search`.
+- **Accepted (user decision, 2026-11-24):** *Redmine Notifier* bot mentions are intentionally not covered by `inbox`/`standup`, and there is no `--include-bots` option; for assignment notices use Redmine (`lwr`) instead.
+- **−** Time windows depend on result ordering; a page cap bounds very large windows.
+- **−** `search` can no longer find partial words the index doesn't match.
+- **Note:** `lwchat mentions` lives on the unmerged `feat/chat-mentions` branch; it can use the same mention filter with `--user <id>` once merged.
+
+---
+
 ## How to add a new ADR
 
 1. Bump the number (ADR-012, etc.).

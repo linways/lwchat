@@ -257,7 +257,7 @@ Rebuilds the regex on every message. For a 20-page × 100-message scan = 2000 co
 - **Splitting `commands.js`.** It's 1108 lines, fits in editor, easy to grep. Splitting would fragment the multi-step "find the dispatch case → find the implementation" flow.
 - **Adding TypeScript.** Zero-dep is load-bearing (ADR-001). JSDoc is the right alternative if we ever want IDE help.
 - **Replacing `execSync("lwr ...")` with a library.** `lwr` is a CLI; the shell call is the right boundary. Already optional.
-- **Server-side message search.** Google Chat API doesn't expose one. Client-side scan is the honest answer (ADR documented as a known limit).
+- **Server-side message search.** ~~Google Chat API doesn't expose one.~~ Outdated: `spaces.messages.search` is GA and is now used first by `find`/`search`, with the scan kept as fallback (ADR-016, 2026-11-23).
 - **Plugin / JS hook surface.** Explicitly rejected by ADR-006.
 
 ---
