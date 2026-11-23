@@ -339,7 +339,7 @@ lwchat search <term> --case-sensitive                   # default is case-insens
 lwchat search <term> --json                             # structured
 ```
 
-Uses Google Chat's server-side search (`spaces.messages.search`) first, so it covers full history, across the **whole space catalog** by default (including DMs and group chats unless `search_include_dms: false`). There is **no scan fallback**: messages posted by bots / Chat apps and messages in muted spaces are never returned (to find a bot-started Redmine thread use `lwchat find <id> --scan`). A search error fails the command. `--json` reports `method: "chat_search"`, and `scope` is `"catalog"` or the list of aliases searched. Every result carries `allowed: true|false`. Returns per match: `space_alias`, `thread`, `sender_name`, `created`, and a snippet. Results are capped by `--limit`; if the cap is hit, the human output says so.
+Uses Google Chat's server-side search (`spaces.messages.search`), so it covers full history, across the **whole space catalog** by default (including DMs and group chats unless `search_include_dms: false`). There is **no scan fallback**: messages posted by bots / Chat apps and messages in muted spaces are never returned (to find a bot-started Redmine thread use `lwchat find <id> --scan`). A search error fails the command. `--json` reports `method: "chat_search"`, and `scope` is `"catalog"` or the list of aliases searched. Every result carries `allowed: true|false`. Returns per match: `space_alias`, `thread`, `sender_name`, `created`, and a snippet. Results are capped by `--limit`; if the cap is hit, the human output says so.
 
 **JSON shape:**
 ```json
@@ -473,7 +473,7 @@ lwchat restore [name]       # latest if no name
 
 `config.json` keys:
 - **spaces**: alias → Google Chat space ID
-- **default_spaces**: the **allowed list** — spaces the scan fallback covers and the only ones `reply`/`post` write to. Change it with `spaces allow|disallow`
+- **default_spaces**: the **allowed list** — spaces `find`'s scan (`--scan` / zero-hit fallback) and `index` cover, and the only ones `reply`/`post` write to. Change it with `spaces allow|disallow`
 - **search_include_dms**: include DMs and group chats in the catalog-wide search scope (default `true`)
 - **redmine_spaces**: learned subset of `default_spaces` that host Redmine threads; `find` scans these first, with a full fallback. Self-tuning — don't hand-trim it
 - **redmine_url_pattern**: regex to match your Redmine instance's issue URL (the trailing issue id is captured automatically)

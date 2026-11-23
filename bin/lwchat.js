@@ -58,8 +58,8 @@ COMMANDS:
     spaces sync                         Re-sync the catalog of every space you're in (auto-refreshed daily)
     spaces allow <alias|id|name>        Allow a space (scan + post); logged to ~/.lwchat/space-changes.ndjson
     spaces disallow <alias|id|name>     Disallow a space (stays searchable via the catalog)
-    spaces fetch                        Fetch all spaces from Google Chat
-    spaces add <alias> <space_id>       Add + allow a space
+    spaces fetch                        Raw list of named spaces from Google Chat
+    spaces add <alias> <space_id>       Older form: alias + allow a space by id
     spaces remove <alias>               Remove a space
 
     find    <issue_id> [--allowed-only] [--scan]
@@ -68,10 +68,11 @@ COMMANDS:
     read    <target> [--as kind] [--scan] [--limit N] [--analyze|--download] [--out <dir>]
                       Read an issue/thread/space/DM/person with one uniform JSON shape; attachments are always listed
     digest  <issue_id> [--space <a>] [--scan] Merged brief: Redmine status + chat participants/activity + timeline
-    inbox   [--days N] [--space <a>]    Messages @mentioning you, grouped by issue, flagged awaiting-reply
+    inbox   [--days N] [--space <a>] [--allowed-only]
+                                        Messages @mentioning you (server-side search, every space you're in), grouped by thread, flagged awaiting-reply
     mentions [--user <who>] [--spaces a,b] [--allowed-only] [--date D | --from D [--to D]]  Threads where someone was @mentioned, by IST day (--user: server-side search)
-    standup [--user <name|email|id>] [--hours N] [--space <a>] [--card [--webhook <alias|url>]] [--team]
-                                        Standup buckets (last 24h, default = you; --user targets a teammate; --team runs every standup_team member); --card posts a clickable card to a Chat webhook
+    standup [--user <name|email|id>] [--hours N] [--space <a>] [--allowed-only] [--card [--webhook <alias|url>]] [--team]
+                                        Standup buckets (last 24h, default = you; --user targets a teammate; --team runs every standup_team member; named spaces only, never DMs); --card posts a clickable card to a Chat webhook
     standup team list|add <who>|remove <who>
                                         Manage standup_team (the members --team / the scheduled run cover)
     standup cron install [--at HH:MM] [--days mon-sat] | status | remove
@@ -86,14 +87,14 @@ COMMANDS:
     directory <query> [--refresh]       Search the org directory (cached 24h)
     warm                                Pre-fetch all configured spaces' members + names (cache hot)
     search  <term> [--space <a> | --spaces a,b,c] [--allowed-only] [--limit N] [--case-sensitive]
-                                        Search messages (Chat server-side search over the space catalog; scan fallback on allowed spaces). Each hit has allowed: true|false
+                                        Search messages with Chat server-side search over every space you're in (no scan: bot posts and muted spaces aren't returned). Each hit has allowed: true|false
 
     threads [--space <alias>]           List recent threads
-    by      <user> [--space <a>] [--include-replies] [--limit N]
-                                        A person's recent posts (top-level by default; --include-replies widens)
-    index   [--space <alias>] [--deep]   Build/refresh the thread-to-issue index (--deep = one-time historical backfill)
+    by      <user> [--space <a>] [--allowed-only] [--include-replies] [--limit N]
+                                        A person's recent posts via server-side search (top-level by default; --include-replies widens)
+    index   [--space <alias>] [--deep]   Pre-build the thread-to-issue cache by scanning allowed spaces (--deep = one-time historical backfill; find works without it)
     cache   [show]                      Show cached threads + freshness (TTL)
-    cache   clear                       Clear the thread location cache
+    cache   clear                       Clear the thread, member and directory caches
 
     members [--space <alias>]           List space members (name → user ID)
     members refresh [--space <alias>]   Refresh member cache from API
@@ -110,15 +111,13 @@ FLAGS:
     -h, --help      Show this help
 
 SETUP:
-    # Option 1: Fresh OAuth login
-    lwchat auth login --client-id <id> --client-secret <secret>
+    # Sign in (bundled Workspace OAuth client; --client-id/--client-secret for your own,
+    # --import-gws to reuse gws credentials)
+    lwchat auth login
 
-    # Option 2: Import existing gws credentials
-    lwchat auth login --import-gws
-
-    # Then add spaces to search
-    lwchat spaces fetch
-    lwchat spaces add exam-controller spaces/AAAAdOaHhRY
+    # Catalog every space you're in, then allow the ones lwchat may post in / scan
+    lwchat spaces sync
+    lwchat spaces allow "V4 - EXAM CONTROLLER"
 
 EXAMPLES:
     lwchat find 126270
