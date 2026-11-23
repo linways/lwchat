@@ -10,6 +10,8 @@ bin/lwchat.js       CLI entry: global flags, value-flag pop, dispatch
 lib/
   auth.js           OAuth2 loopback + token refresh + --import-gws
   chat-api.js       API client (api() helper) + every Chat/People endpoint + mentions
+  chat-search.js    Pure helpers for Chat server-side search (filters, hit → thread candidates, merge)
+  space-catalog.js  Pure helpers for the space catalog + allowed list (aliases, resolve, scope, write guard)
   commands.js       Every command body (one module by design — easy to grep)
   config.js         ~/.lwchat paths, load/save config/tokens/index/members/backups
   me.js             me.md generation + auto-aliasing on first login
@@ -163,7 +165,8 @@ lwchat doesn't have a unit-test harness yet (see [ROADMAP](ROADMAP.md) candidate
 1. **`lwchat doctor`** — the runtime self-test. 6 sections, exits non-zero on failure. Run after every code change.
 2. **`myspace`** — the user's solo space, configured as the alias `myspace`. Posting here verifies the full pipeline (auth → API → mention resolution → message sent) without bothering anyone.
 3. **Self-DM error path** — `lwchat dm <your-own-email>` is *expected* to error with `"No existing DM space with users/..."`. This confirms the resolution + findDirectMessage path without sending a real DM.
-4. **Search against known terms** — `lwchat search "<term known to exist>" --limit 3 --space exam-controller` exercises pagination + matching + sender-name resolution.
+4. **Search against known terms** — `lwchat search "<term known to exist>" --limit 3 --space exam-controller --json` should report `method: "chat_search"` (search has no scan fallback; a partial word the index can't match returns 0). `lwchat inbox --json` and `lwchat standup --json` (never `--card` when testing) exercise the mention/sender filters.
+6. **Write guard without posting** — run `post`/`reply` against a non-allowed space with `fetch` stubbed (`node --import 'data:text/javascript,globalThis.fetch=async()=>{throw new Error("BLOCKED")}' bin/lwchat.js post <non-allowed-alias> "x" --json`): it must refuse with `not_allowed` and never print `BLOCKED`.
 5. **JSON shape sanity** — pipe `--json` output through `node -e 'JSON.parse(...)'` to confirm shape.
 
 Until there's a proper unit-test harness, **every PR should include a paste of the relevant commands and their output**, including `lwchat doctor`, in the description.
@@ -263,7 +266,8 @@ For larger changes, structure as: read existing patterns in `commands.js`, mirro
 |---|---|
 | `lwchat` not found after install | `node install.mjs status` — is the binary symlink present? |
 | Auth fails with 401 | `lwchat doctor` `auth.refresh` row; then `lib/auth.js` token refresh |
-| `find`/`read` returns nothing for a known issue | `lwchat cache clear`, then retry; check `config.redmine_url_pattern` |
+| `find`/`read` returns nothing for a known issue | `lwchat cache clear`, then retry; check `config.redmine_url_pattern`; a bot-started thread is invisible to Chat search — try `lwchat find <id> --scan` (allowed spaces only) |
+| `reply`/`post` refused with `not_allowed` | the space isn't in `default_spaces`; `lwchat spaces` to check, `lwchat spaces allow <alias>` (with the user's OK); history in `~/.lwchat/space-changes.ndjson` |
 | Wrong thread for `reply` (multi-space) | `lwchat find <id>` to see all locations; pass `--space <alias>` |
 | `@mention` rendered as text in Chat | check `lwchat members --space <alias>` — is the name in the map? |
 | `me.md` missing identity | doctor's `network.chat` row; usually a missing People API scope (re-auth) |

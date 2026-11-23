@@ -4,7 +4,7 @@ Full reference for `lwchat standup`. (SKILL.md keeps only the essentials + the
 default-action directive; this file is the detail.)
 
 ## Modes
-- `lwchat standup [--user <who>] [--hours N] [--space <a>] [--json]` — read-only report.
+- `lwchat standup [--user <who>] [--hours N] [--space <a>] [--allowed-only] [--json]` — read-only report.
 - `lwchat standup --card [--webhook <alias|url>] …` — post a clickable Chat card.
 - `lwchat standup --team [--card]` — one report/card per `standup_team` member.
 - `lwchat standup team list|add <who>|remove <who>` — manage the team list.
@@ -17,6 +17,12 @@ Default **24h** (`--hours N` to widen, e.g. `--hours 72` on Mondays).
 - `--user` resolves a name/email/`users/<id>` via the directory; default = you.
 - Buckets by chat signals; a thread is included if it @mentions the target OR the
   target posted in it within the window.
+- Candidates come from two Google Chat server-side searches (`sender.name` and the
+  mention annotation), merged, across the **named spaces** in your space catalog.
+  DMs and group chats are always excluded (a card is posted to a shared webhook).
+  `--allowed-only` limits to the allowed list, `--space` to one space. Only spaces
+  *you* are in are visible, and search can't see bot / Chat-app posts or muted
+  spaces. The window is applied client-side (the API rejects `createTime` filters).
 - Recognized hashtags (case/separator/typo tolerant): prod →
   `#prod_release`/`#movedToProduction`/`#movedToProd`; qa → `#qa_release`/`#movedToQa`;
   `#tested`; `#reopened`. `#prod_release`/`#qa_release` (and aliases) count only

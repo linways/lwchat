@@ -33,7 +33,8 @@ lwchat reply 126235 "deployed @Ranjith"     # post back, @mention auto-resolved
 lwchat inbox                                # messages @mentioning you, awaiting your reply
 lwchat post myspace "Hi team"               # top-level message to any space
 lwchat dm sibin@linways.com "ping"          # DM by email/name/id
-lwchat search "folio bug" --space cicd      # client-side search across spaces
+lwchat find 126235 --scan                   # also scan allowed Redmine spaces for bot-started threads (slow)
+lwchat search "folio bug"                   # Chat server-side search across every space you're in
 lwchat by "Akshay Chandran" --space cicd    # a person's recent posts (top-level by default)
 
 lwchat me     # who am I, which spaces am I in
@@ -176,12 +177,13 @@ If any check fails, the line tells you which subsystem and how to fix it. The mo
 ## Step 4: Configure spaces (one-time)
 
 ```bash
-lwchat spaces fetch                                  # discover available spaces
-lwchat spaces add exam-controller spaces/AAAAdOaHhRY # alias for easier commands
-lwchat spaces add cicd spaces/AAAAxxxxxxxx           # add as many as you need
+lwchat spaces sync                                   # catalog every space you're in
+lwchat spaces                                        # see the catalog + which are allowed
+lwchat spaces allow "V4 - EXAM CONTROLLER"           # allow by alias, id or name
+lwchat spaces add cicd spaces/AAAAxxxxxxxx           # older form: alias + allow
 ```
 
-Aliases are optional — any command accepts raw `spaces/<id>` too — but agents are much easier to read with named aliases.
+`find` and `search` read the whole catalog through Google Chat search. The **allowed list** (`default_spaces`) is where `find --scan` looks for bot-started threads and the only place `reply`/`post` write to; nothing is allowed automatically, and each change is logged to `~/.lwchat/space-changes.ndjson`. Aliases are optional — any command accepts raw `spaces/<id>` too.
 
 ---
 
@@ -203,6 +205,8 @@ Aliases are optional — any command accepts raw `spaces/<id>` too — but agent
   me.md                    generated identity + spaces snapshot
   cache/thread-index.json  issue_id → { space_alias → { thread, indexed_at } }
   cache/members.json       space → { user_id → name }, refreshed every 7 days
+  cache/spaces.json        catalog of every space / DM / group chat, refreshed daily
+  space-changes.ndjson     append-only log of allowed-list changes
   backups/                 timestamped snapshots (config + tokens + me.md + caches)
   skill/                   canonical SKILL.md + recipes (managed by install.mjs)
 ```

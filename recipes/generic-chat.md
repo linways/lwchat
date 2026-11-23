@@ -98,7 +98,8 @@ This is intentional ([ADR-010](../docs/DECISIONS.md#adr-010-dont-request-the-cha
 ## Search messages across spaces
 
 ```bash
-lwchat search "<term>"                                    # default_spaces
+lwchat search "<term>"                                    # whole space catalog
+lwchat search "<term>" --allowed-only                     # allowed spaces only (default_spaces)
 lwchat search "<term>" --space exam-controller            # one space
 lwchat search "<term>" --spaces exam-controller,cicd      # comma-separated subset
 lwchat search "<term>" --limit 50                         # default 30
@@ -106,11 +107,15 @@ lwchat search "<term>" --case-sensitive                   # default is insensiti
 lwchat search "<term>" --json                             # structured
 ```
 
-Returns per match: `space_alias`, `thread`, `sender_name`, `created`, snippet. Human output flags `(limit reached — use --limit to expand)` when the cap fires, so the agent knows there may be more results.
+Returns per match: `space_alias`, `thread`, `sender_name`, `created`, snippet, `is_reply`, and `allowed`. `--json` also reports `method` (always `chat_search`) and `scope` (`"catalog"`, or the aliases searched). Human output flags `(limit reached — use --limit to expand)` when the cap fires, so the agent knows there may be more results.
 
-### Honest about the constraint
+### How it searches
 
-Google Chat's `messages.list` filter doesn't support content search, so this is a **bounded client-side scan** — paginates per space, capped by `page_limit` (100 messages/page). Deep history searches across many spaces are expensive. If a search seems incomplete, raise `--limit` and/or `--page-limit` in the config.
+- **Server-side first.** `search` calls Google Chat's `spaces.messages.search`: one indexed call, full history, across the **whole space catalog** by default — every space, DM and group chat you're in (DMs/group chats can be excluded with `search_include_dms: false` in config). Hits are re-checked with a substring match, so `--case-sensitive` and partial terms behave as before.
+- **`allowed` flag.** A hit with `allowed: false` is in a space that isn't on your allowed list. Reading it is fine; `post`/`reply` there will be refused until the user allows the space (`lwchat spaces allow <alias>`, ask first).
+- **Narrowing.** `--allowed-only` limits the search to the allowed list; `--space` / `--spaces a,b` to named spaces (config or catalog aliases, or raw ids).
+- **Crowding.** Catalog-wide, one busy chat (e.g. a bot audit group chat that repeats issue titles) can fill the whole `--limit`. If the results are all from one noisy space, re-run with `--allowed-only` or `--spaces`.
+- **No scan fallback.** `search` is server-side only. It never returns messages posted by Chat apps/bots or in muted spaces; for a bot-started Redmine thread use `lwchat find <id> --scan`. A search error fails the command (`Chat search failed: …`). Partial words that the index doesn't match (e.g. `"utomatic"`) return nothing.
 
 ### Combine with other commands
 
@@ -146,7 +151,7 @@ shape used for issue, space, and DM reads.
 ## A person's recent posts
 
 ```bash
-lwchat by <user> [--space <alias>] [--include-replies] [--limit N] [--json]
+lwchat by <user> [--space <alias>] [--allowed-only] [--include-replies] [--limit N] [--json]
 ```
 
 Lists someone's recent messages, newest first. **Posts vs replies matters:** a

@@ -29,8 +29,22 @@ description/attachments (`lwr issue view`) or the chat side alone (`lwchat read`
 
 2. Check if there's a chat thread with discussion:
    ```bash
-   lwchat read <id> --json
+   lwchat find <id> --json     # where the thread(s) are
+   lwchat read <id> --json     # the messages
    ```
+
+   `find` uses Google Chat's server-side search, so it reaches threads of any
+   age across every space the user is in. Each location has `found_by`
+   (`chat_search` or `scan`) and `allowed` (`false` = readable, but `reply`
+   won't post there). Search can't see threads started by a bot (e.g. "Redmine
+   Notifier") or in muted spaces. When search finds nothing, `find` scans
+   recent pages of the allowed spaces automatically (`complete: true`). When
+   search found something, the result is `complete: false` with a `hint`: a
+   bot-started thread in another space may be missing. For context gathering
+   that is usually fine; if you need every space (e.g. before choosing where
+   to reply), run `lwchat find <id> --scan --json` (slow, minutes). If a known
+   bot-started thread is still missing because it has been quiet for a long
+   time, run `lwchat index --deep` once (slow; ask the user) and retry.
 
    If the thread includes voice/audio attachments or empty-text messages that
    look like uploaded voice notes, analyze them in the same read call:
@@ -48,6 +62,13 @@ description/attachments (`lwr issue view`) or the chat side alone (`lwchat read`
    - Chat voice transcripts give you: spoken clarifications that were not present in message text
 
 4. If the chat thread has messages, summarize the discussion for context before proceeding with the task.
+
+## Triage first: `inbox`
+
+`lwchat inbox --json` lists threads that @mention you in the last 14 days across
+every space you're in (one server-side search, seconds), flagged
+`awaiting_reply`. It can't see mentions inside bot posts (e.g. Redmine Notifier
+assignments) — Redmine is the source for those.
 
 ## When to use
 
